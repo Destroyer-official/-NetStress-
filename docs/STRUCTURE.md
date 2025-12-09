@@ -1,13 +1,13 @@
 # Project Structure
 
-Overview of the Destroyer-DoS codebase organization.
+Overview of the NetStress codebase organization.
 
 ---
 
 ## Directory Layout
 
 ```
-Destroyer-DoS/
+NetStress/
 ├── core/                   # Framework modules
 │   ├── ai/                 # AI/ML optimization
 │   ├── analytics/          # Performance analytics

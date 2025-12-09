@@ -35,13 +35,13 @@ ML_REQUIREMENTS = [
 ]
 
 setup(
-    name='destroyer-dos',
+    name='netstress',
     version='1.0.0',
     description='Network stress testing framework for security research',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Destroyer-official',
-    url='https://github.com/Destroyer-official/Destroyer-DoS',
+    url='https://github.com/Destroyer-official/-NetStress-',
     license='MIT',
     
     packages=find_packages(),

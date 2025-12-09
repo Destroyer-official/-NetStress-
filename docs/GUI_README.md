@@ -1,6 +1,6 @@
 # GUI Interface
 
-Graphical user interface for Destroyer-DoS.
+Graphical user interface for NetStress.
 
 ---
 

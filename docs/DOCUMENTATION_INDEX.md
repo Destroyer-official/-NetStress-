@@ -1,6 +1,6 @@
 # Documentation Index
 
-Complete guide to all Destroyer-DoS documentation.
+Complete guide to all NetStress documentation.
 
 ---
 

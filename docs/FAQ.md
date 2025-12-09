@@ -2,7 +2,7 @@
 
 ## General
 
-### What is Destroyer-DoS?
+### What is NetStress?
 
 A network stress testing tool for authorized security assessments. It supports 15 attack protocols and can achieve throughput up to 16 Gbps.
 

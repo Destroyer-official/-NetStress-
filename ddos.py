@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Destroyer-DoS Framework - Main Attack Engine
-Advanced DDoS Testing Framework with Full Core Module Integration
+NetStress - Network Stress Testing Framework
+Main Attack Engine with Full Core Module Integration
 
-This module integrates ALL core subsystems:
+Core Modules:
 - AI/ML Optimization (core/ai)
 - Analytics & Visualization (core/analytics)
 - Autonomous Adaptation (core/autonomous)
@@ -1543,7 +1543,7 @@ async def run_attack(target: str, port: int, protocol: str, duration: int,
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Destroyer-DoS Framework - Advanced DDoS Testing Tool',
+        description='NetStress - Network Stress Testing Framework',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

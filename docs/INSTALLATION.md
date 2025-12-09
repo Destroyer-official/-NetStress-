@@ -11,8 +11,8 @@
 ## Quick Installation
 
 ```bash
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
 # venv\Scripts\activate   # Windows
@@ -28,8 +28,8 @@ pip install -r requirements.txt
 3. Run:
 
 ```cmd
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
@@ -41,8 +41,8 @@ python ddos.py --status
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip python3-venv git
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -53,8 +53,8 @@ python ddos.py --status
 
 ```bash
 brew install python3 git
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -84,7 +84,7 @@ python ddos.py --status
 Expected output:
 
 ```
-=== Destroyer-DoS System Status ===
+=== NetStress System Status ===
 Safety Systems:    Available
 AI/ML Systems:     Available
 Autonomous:        Available
@@ -118,7 +118,7 @@ The "No libpcap provider" warning is normal on Windows. Scapy will still work fo
 ## Updating
 
 ```bash
-cd Destroyer-DoS
+cd -NetStress-
 git pull origin main
 pip install -r requirements.txt --upgrade
 ```
@@ -128,6 +128,6 @@ pip install -r requirements.txt --upgrade
 ```bash
 deactivate  # Exit virtual environment
 cd ..
-rm -rf Destroyer-DoS  # Linux/macOS
-# rmdir /s Destroyer-DoS  # Windows
+rm -rf -NetStress-  # Linux/macOS
+# rmdir /s -NetStress-  # Windows
 ```

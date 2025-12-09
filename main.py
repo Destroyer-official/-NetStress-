@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Destroyer-DoS Framework - Main Entry Point
+NetStress - Network Stress Testing Framework
+Main Entry Point
 
-This module provides the main entry point for the framework.
 For the full attack engine, use ddos.py directly.
 """
 

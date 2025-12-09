@@ -1,6 +1,6 @@
 # CLI Usage Guide
 
-Command-line interface reference for Destroyer-DoS.
+Command-line interface reference for NetStress.
 
 ---
 

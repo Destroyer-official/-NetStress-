@@ -1,14 +1,14 @@
 # Quick Reference
 
-Essential commands and information for Destroyer-DoS.
+Essential commands and information for NetStress.
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 pip install -r requirements.txt
 ```
 

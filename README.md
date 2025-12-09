@@ -1,6 +1,6 @@
-# Destroyer-DoS Framework
+# NetStress
 
-Network stress testing and security assessment tool for authorized penetration testing.
+Network stress testing framework for security research.
 
 ## Legal Notice
 
@@ -18,8 +18,8 @@ Network stress testing and security assessment tool for authorized penetration t
 
 ```bash
 # Clone and setup
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 python -m venv venv
 venv\Scripts\activate  # Windows
 # source venv/bin/activate  # Linux/macOS
@@ -139,7 +139,7 @@ Core dependencies are listed in `requirements.txt`:
 ## Project Structure
 
 ```
-Destroyer-DoS/
+NetStress/
 ├── ddos.py                 # Main attack engine
 ├── main.py                 # Entry point
 ├── comprehensive_stress_test.py  # Test suite

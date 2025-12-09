@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 class ResourceLimits:
     """Resource usage limits for safety"""
     max_cpu_percent: float = 99.0  # Maximum CPU for stress testing
-    max_memory_percent: float = 95.0  # Maximum memory for stress testing
-    max_network_mbps: float = 10000.0  # 10 Gbps limit for high throughput
-    max_connections: int = 500000  # High connection limit
-    max_packets_per_second: int = 10000000  # 10M PPS limit
-    max_duration_minutes: int = 60
+    max_memory_percent: float = 99.0  # Maximum memory for stress testing
+    max_network_mbps: float = 90000.0  # 90 Gbps limit for high throughput
+    max_connections: int = 900000  # High connection limit
+    max_packets_per_second: int = 90000000  # 90M PPS limit
+    max_duration_minutes: int = 360
 
 @dataclass
 class TargetInfo:

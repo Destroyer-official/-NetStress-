@@ -1,12 +1,12 @@
 # Project Analysis
 
-Technical analysis of the Destroyer-DoS framework.
+Technical analysis of the NetStress framework.
 
 ---
 
 ## Overview
 
-Destroyer-DoS is a network stress testing framework written in Python. It provides 15 attack protocols, comprehensive safety systems, and optional AI optimization.
+NetStress is a network stress testing framework written in Python. It provides 15 attack protocols, comprehensive safety systems, and optional AI optimization.
 
 ---
 

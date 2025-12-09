@@ -1,6 +1,6 @@
 # Usage Guide
 
-Complete guide to using Destroyer-DoS Framework.
+Complete guide to using NetStress.
 
 ## Command Line Interface
 

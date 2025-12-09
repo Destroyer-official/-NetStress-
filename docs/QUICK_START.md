@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get started with Destroyer-DoS in 5 minutes.
+Get started with NetStress in 5 minutes.
 
 ## Prerequisites
 
@@ -14,8 +14,8 @@ Get started with Destroyer-DoS in 5 minutes.
 ### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/Destroyer-official/Destroyer-DoS.git
-cd Destroyer-DoS
+git clone https://github.com/Destroyer-official/-NetStress-.git
+cd -NetStress-
 ```
 
 ### Step 2: Create Virtual Environment
@@ -49,7 +49,7 @@ python ddos.py --status
 Expected output:
 
 ```
-=== Destroyer-DoS System Status ===
+=== NetStress System Status ===
 Safety Systems:    Available
 AI/ML Systems:     Available
 Analytics:         Available

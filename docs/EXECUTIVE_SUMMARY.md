@@ -1,6 +1,6 @@
 # Executive Summary
 
-Destroyer-DoS is a network stress testing framework for security professionals.
+NetStress is a network stress testing framework for security professionals.
 
 ---
 
