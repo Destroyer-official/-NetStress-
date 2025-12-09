@@ -1,0 +1,63 @@
+"""
+AI Orchestrator and Machine Learning Engine
+
+This module provides advanced AI systems for attack optimization,
+including neural network architectures, training pipelines, and
+adaptive strategy engines.
+"""
+
+from .ml_infrastructure import (
+    MLModelManager,
+    NeuralNetworkArchitecture,
+    TrainingDataCollector,
+    ModelTrainingPipeline
+)
+
+from .adaptive_strategy import (
+    AdaptiveStrategyEngine,
+    ReinforcementLearningAgent,
+    GeneticAlgorithmOptimizer,
+    SwarmIntelligenceCoordinator
+)
+
+from .defense_evasion import (
+    DefenseDetectionAI,
+    EvasionTechniqueSelector,
+    AdversarialMLEngine,
+    PatternRecognitionClassifier
+)
+
+from .model_validation import (
+    ModelValidator,
+    PerformanceMetrics,
+    TestDatasetGenerator,
+    RegressionDetector
+)
+
+from .ai_orchestrator import (
+    AIOrchestrator,
+    AIOptimizationResult,
+    ai_orchestrator
+)
+
+__all__ = [
+    'MLModelManager',
+    'NeuralNetworkArchitecture', 
+    'TrainingDataCollector',
+    'ModelTrainingPipeline',
+    'AdaptiveStrategyEngine',
+    'ReinforcementLearningAgent',
+    'GeneticAlgorithmOptimizer',
+    'SwarmIntelligenceCoordinator',
+    'DefenseDetectionAI',
+    'EvasionTechniqueSelector',
+    'AdversarialMLEngine',
+    'PatternRecognitionClassifier',
+    'ModelValidator',
+    'PerformanceMetrics',
+    'TestDatasetGenerator',
+    'RegressionDetector',
+    'AIOrchestrator',
+    'AIOptimizationResult',
+    'ai_orchestrator'
+]

@@ -1,0 +1,25 @@
+{
+  "model_id": "88c244769a19bd00",
+  "model_type": "neural_network",
+  "version": "1.0",
+  "created_at": "2025-12-09 09:52:48.008683",
+  "accuracy": 0.0,
+  "loss": 0.04277930841274034,
+  "training_samples": 1000,
+  "validation_samples": 0,
+  "hyperparameters": {
+    "epochs": 50,
+    "learning_rate": 0.01,
+    "architecture": {
+      "input_dim": 13,
+      "hidden_layers": [
+        64,
+        32,
+        16
+      ],
+      "output_dim": 1,
+      "total_parameters": 3521
+    }
+  },
+  "feature_dimensions": 13
+}
