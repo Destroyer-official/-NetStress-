@@ -76,6 +76,23 @@ NetStress is **NOT**:
 - `MSG_ZEROCOPY` on kernel 4.14+
 - `sendfile()` for file transfers
 
+### ✓ Advanced Evasion System
+
+- **Traffic Shaping**: 8 profiles (aggressive, stealthy, burst, gradual, mimicry, random, pulse, sawtooth)
+- **Protocol Obfuscation**: XOR encoding, Base64 wrapping, HTTP/DNS/TLS mimicry, polymorphic encoding
+- **Timing Patterns**: Human-like, Poisson, random walk, adaptive, Brownian motion
+- **Adaptive Shaping**: Automatically adjusts to avoid detection
+
+### ✓ Distributed Testing
+
+- **Controller/Agent Architecture**: Central coordination of multiple machines
+- **Synchronized Attacks**: All agents start simultaneously
+- **Staggered Start**: Configurable delays between agent starts
+- **Multi-Phase Attacks**: Different settings per attack phase
+- **Real-time Monitoring**: Aggregated statistics from all agents
+- **Secure Communication**: HMAC-signed messages with shared secret
+- **Automatic Failover**: Handles agent disconnections gracefully
+
 ### ✓ Safety Features
 
 - Target validation (blocks production domains)
