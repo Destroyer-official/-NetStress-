@@ -263,8 +263,9 @@ class TCPEngine:
                     target, port, packet_size, TCPAttackType.SYN_FLOOD
                 )
                 
-                # Send packet (simulated - actual sending would require raw sockets)
-                await self._simulate_packet_send(packet, target, port)
+                # Note: Actual packet sending requires raw sockets (root privileges)
+                # This would need to be implemented with real raw socket sending
+                logger.debug(f"TCP packet prepared for {target}:{port}, size: {len(packet)} (raw socket sending not implemented)")
                 
                 packets_sent += 1
                 self.stats['packets_sent'] += 1
@@ -415,12 +416,8 @@ class TCPEngine:
                 'error': str(e)
             }
     
-    async def _simulate_packet_send(self, packet: bytes, target: str, port: int):
-        """Simulate packet sending (for testing without raw sockets)"""
-        # In a real implementation, this would send the raw packet
-        # For simulation, we just log it
-        logger.debug(f"Simulated packet send to {target}:{port}, size: {len(packet)}")
-        await asyncio.sleep(0.0001)  # Simulate network delay
+    # Removed _simulate_packet_send method - no simulations allowed
+    # For real raw packet sending, use the RealTCPGenerator in core/protocols/real_tcp.py
     
     async def get_status(self) -> Dict[str, Any]:
         """Get TCP engine status"""

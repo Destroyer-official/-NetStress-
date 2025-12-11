@@ -1,72 +1,97 @@
 # NetStress
 
-Network stress testing framework for security research.
+A Python-based network stress testing tool for authorized security research and performance testing.
 
 ## Legal Notice
 
-**This tool is for authorized security testing only.** You must have written permission to test any target system. Unauthorized use is illegal. The authors are not responsible for misuse.
+**⚠️ AUTHORIZED USE ONLY ⚠️**
+
+This tool is for authorized security testing and performance evaluation only. You must have explicit written permission to test any target system. Unauthorized use against systems you do not own or have permission to test is illegal and may violate:
+
+- Computer Fraud and Abuse Act (CFAA)
+- Local cybersecurity laws
+- Terms of service agreements
+
+**Use responsibly. The authors assume no liability for misuse.**
+
+## What This Tool Actually Does
+
+NetStress is a Python-based network stress testing framework that generates various types of network traffic to evaluate system performance and resilience. It uses standard operating system networking APIs and socket operations - no kernel bypass or specialized hardware acceleration.
+
+## Honest Capabilities Assessment
+
+### What This Tool ACTUALLY Does:
+
+- ✅ Sends real UDP/TCP/HTTP packets using standard OS sockets
+- ✅ Uses `sendfile()` and `MSG_ZEROCOPY` on Linux when available
+- ✅ Uses `sendmmsg()` for batch UDP sending on Linux (with root)
+- ✅ Applies real socket optimizations (SO_SNDBUF, TCP_NODELAY)
+- ✅ Provides honest performance metrics from OS counters
+
+### What This Tool Does NOT Do:
+
+- ❌ **XDP/eBPF**: No kernel-level packet processing (use [xdp-tools](https://github.com/xdp-project/xdp-tools))
+- ❌ **DPDK**: No kernel bypass networking (use [DPDK](https://www.dpdk.org/))
+- ❌ **Hardware acceleration**: No specialized NIC features or SR-IOV
+- ❌ **Multi-gigabit performance**: Limited by Python interpreter and OS network stack
+- ❌ **Raw packet crafting**: Limited raw socket support (requires root/admin)
+- ❌ **Advanced evasion**: No sophisticated traffic shaping or protocol obfuscation
+- ❌ **Distributed attacks**: Single-machine only, no botnet coordination
+- ❌ **Real-time guarantees**: Subject to Python GIL and OS scheduling
+
+### Realistic Performance Expectations:
+
+| Platform     | UDP PPS   | TCP Conn/sec | Bandwidth |
+| ------------ | --------- | ------------ | --------- |
+| Linux (root) | 500K-2M   | 10K-50K      | 1-10 Gbps |
+| Linux (user) | 100K-500K | 5K-20K       | 500M-5G   |
+| Windows      | 50K-200K  | 2K-10K       | 100M-2G   |
+| macOS        | 100K-300K | 5K-15K       | 500M-3G   |
+
+**Note:** These are realistic ranges. Localhost tests don't reflect real network performance.
+
+For detailed capabilities, run: `python ddos.py --status`
 
 ## Features
 
-- 15 attack protocols (TCP, UDP, HTTP, HTTPS, DNS, ICMP, Slowloris, and more)
-- Verified performance up to 16 Gbps throughput
+- 15 attack protocols (TCP, UDP, HTTP, HTTPS, DNS, ICMP, etc.)
 - Cross-platform support (Windows, Linux, macOS)
-- Built-in safety controls and audit logging
-- AI-assisted parameter optimization
+- Built-in safety controls
+- Configurable parameters
 
 ## Quick Start
 
 ```bash
-# Clone and setup
 git clone https://github.com/Destroyer-official/-NetStress-.git
 cd -NetStress-
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/macOS
 pip install -r requirements.txt
-
-# Verify installation
-python ddos.py --status
-
-# Run a test (authorized targets only)
-python ddos.py -i TARGET_IP -p 80 -t UDP -d 30
+python ddos.py --help
 ```
 
 ## Supported Protocols
 
-| Protocol     | Description                | Requirements     |
-| ------------ | -------------------------- | ---------------- |
-| TCP          | TCP connection flood       | None             |
-| UDP          | UDP packet flood           | None             |
-| HTTP         | HTTP request flood         | Web server       |
-| HTTPS        | HTTPS request flood        | SSL web server   |
-| DNS          | DNS query flood            | None             |
-| ICMP         | ICMP echo flood            | Admin privileges |
-| SLOW         | Slowloris attack           | Web server       |
-| TCP-SYN      | Raw SYN packets            | Admin + Scapy    |
-| TCP-ACK      | Raw ACK packets            | Admin + Scapy    |
-| PUSH-ACK     | TCP with payload           | Admin + Scapy    |
-| SYN-SPOOF    | Spoofed SYN flood          | Admin + Scapy    |
-| NTP          | NTP amplification          | None             |
-| MEMCACHED    | Memcached amplification    | None             |
-| WS-DISCOVERY | WS-Discovery amplification | None             |
-| QUANTUM      | High-entropy packets       | None             |
+| Protocol     | Type          | Description              |
+| ------------ | ------------- | ------------------------ |
+| TCP          | Flood         | TCP connection flood     |
+| UDP          | Flood         | UDP packet flood         |
+| HTTP         | Layer 7       | HTTP request flood       |
+| HTTPS        | Layer 7       | HTTPS request flood      |
+| DNS          | Query         | DNS query flood          |
+| ICMP         | Echo          | ICMP echo flood          |
+| SLOW         | Slowloris     | Slow HTTP attack         |
+| TCP-SYN      | Raw packet    | SYN flag flood           |
+| TCP-ACK      | Raw packet    | ACK flag flood           |
+| PUSH-ACK     | Raw packet    | PUSH-ACK flood           |
+| SYN-SPOOF    | Spoofed       | Spoofed SYN flood        |
+| NTP          | Amplification | NTP reflection           |
+| MEMCACHED    | Amplification | Memcached reflection     |
+| WS-DISCOVERY | Amplification | WS-Discovery reflection  |
+| QUANTUM      | Mixed         | Randomized payload flood |
 
-## Performance Results
+## Usage
 
-Tested on Windows with 4 CPU cores:
-
-| Configuration              | Throughput | Packets/sec |
-| -------------------------- | ---------- | ----------- |
-| UDP 8192 bytes, 32 threads | 16.03 Gbps | 244,630     |
-| UDP 4096 bytes, 32 threads | 8.40 Gbps  | 256,450     |
-| UDP 1472 bytes, 64 threads | 2.60 Gbps  | 220,650     |
-| QUANTUM 4096 bytes         | 1.95 Gbps  | 59,440      |
-
-## Command Reference
-
-```
-python ddos.py [OPTIONS]
+```bash
+python ddos.py -i TARGET -p PORT -t PROTOCOL [OPTIONS]
 
 Required:
   -i, --ip      Target IP or hostname
@@ -77,119 +102,89 @@ Optional:
   -d, --duration    Duration in seconds (default: 60)
   -x, --threads     Worker threads (default: 4)
   -s, --size        Packet size in bytes (default: 1472)
-  --ai-optimize     Enable adaptive optimization
   --status          Show system status
-  -v, --verbose     Verbose output
 ```
 
 ## Examples
 
 ```bash
-# Basic UDP flood
+# UDP flood
 python ddos.py -i 192.168.1.100 -p 80 -t UDP -d 60
-
-# High throughput UDP
-python ddos.py -i 192.168.1.100 -p 80 -t UDP -s 8192 -x 32 -d 60
 
 # HTTP flood
 python ddos.py -i 192.168.1.100 -p 80 -t HTTP -x 8 -d 60
 
-# Slowloris
-python ddos.py -i 192.168.1.100 -p 80 -t SLOW -x 500 -d 300
-
-# Check system status
+# Check status
 python ddos.py --status
 ```
 
-## System Requirements
+## Requirements
 
-- Python 3.8 or higher
-- 4 GB RAM minimum
-- Administrator/root access for raw packet protocols
-- Scapy library for TCP-SYN, TCP-ACK, PUSH-ACK, SYN-SPOOF
+- Python 3.8+
+- Dependencies: `pip install -r requirements.txt`
+- Admin/root for raw packet protocols (TCP-SYN, ICMP, etc.)
 
-## Installation
+## Important Limitations
 
-### Windows
+### Performance Constraints
 
-```cmd
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+- **Python Interpreter Overhead**: ~10-100x slower than equivalent C/C++ tools
+- **Global Interpreter Lock (GIL)**: Limits CPU-bound parallelism to single core
+- **Memory Management**: Garbage collection can cause periodic latency spikes
+- **Standard Network Stack**: Uses OS sockets, not kernel bypass (DPDK/XDP)
 
-### Linux/macOS
+### Testing Limitations
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+- **Localhost Deception**: Tests against 127.0.0.1 measure memory copy speed, not network performance
+- **Single Machine**: Cannot simulate distributed attacks or realistic traffic patterns
+- **Resource Bounded**: Limited by your machine's CPU, memory, and network interface
+- **OS Dependent**: Performance varies significantly between Windows, Linux, and macOS
 
-### Dependencies
+### Realistic Use Cases
 
-Core dependencies are listed in `requirements.txt`:
+✅ **Good for:**
 
-- psutil
-- numpy
-- aiohttp
-- scapy
-- faker
+- Educational purposes and learning network protocols
+- Basic load testing of development servers
+- Proof-of-concept security demonstrations
+- Understanding network behavior under stress
+
+❌ **Not suitable for:**
+
+- Production-grade performance testing (use iperf3, wrk, or commercial tools)
+- Realistic DDoS simulation (use distributed testing frameworks)
+- High-throughput benchmarking (use compiled tools like hping3)
+- Advanced penetration testing (use specialized security tools)
 
 ## Project Structure
 
 ```
 NetStress/
-├── ddos.py                 # Main attack engine
-├── main.py                 # Entry point
-├── comprehensive_stress_test.py  # Test suite
-├── core/                   # Core modules
-│   ├── ai/                 # Optimization
-│   ├── analytics/          # Metrics
-│   ├── safety/             # Safety controls
-│   └── ...
-├── config/                 # Configuration files
-├── docs/                   # Documentation
-└── tests/                  # Test suite
+├── ddos.py           # Main script
+├── main.py           # Entry point
+├── core/             # Core modules
+├── config/           # Configuration
+├── docs/             # Documentation
+└── tests/            # Tests
 ```
 
 ## Safety Features
 
 - Target validation
-- Resource monitoring (CPU, memory limits)
+- Resource monitoring
 - Emergency shutdown (Ctrl+C)
 - Audit logging
-- Environment detection
-
-## Running Tests
-
-```bash
-# Run comprehensive test
-python real_comprehensive_test.py
-
-# Test specific protocol
-python comprehensive_stress_test.py -t 127.0.0.1 -p 80 --protocol UDP --duration 10
-
-# Test all protocols
-python comprehensive_stress_test.py -t 127.0.0.1 -p 80 --all --duration 5
-```
 
 ## Documentation
 
-- [Quick Start Guide](docs/QUICK_START.md)
+- [Quick Start](docs/QUICK_START.md)
 - [Usage Guide](docs/USAGE.md)
-- [API Reference](docs/API_REFERENCE.md)
-- [Performance Results](docs/PERFORMANCE_RESULTS.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE)
 
 ## Disclaimer
 
-This software is provided for educational and authorized testing purposes only. Users are responsible for complying with all applicable laws. The authors disclaim all liability for misuse.
+This is an educational tool for authorized testing only. The authors are not responsible for misuse. Users must comply with all applicable laws.

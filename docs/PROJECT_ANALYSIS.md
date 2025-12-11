@@ -6,7 +6,14 @@ Technical analysis of the NetStress framework.
 
 ## Overview
 
-NetStress is a network stress testing framework written in Python. It provides 15 attack protocols, comprehensive safety systems, and optional AI optimization.
+NetStress is a Python-based network stress testing tool. It provides 15 attack protocols and basic safety systems.
+
+**Important Limitations:**
+
+- This is a Python script, not a high-performance compiled tool
+- No actual kernel bypass (XDP/DPDK/eBPF code is placeholder/simulation)
+- "AI optimization" is basic heuristic parameter tuning, not machine learning
+- Performance is limited by Python interpreter and OS network stack
 
 ---
 
@@ -109,22 +116,32 @@ Performance monitoring.
 
 ## Performance Characteristics
 
-### Verified Results
+### Important Note
 
-| Protocol     | Packet Size | Threads | Throughput | PPS     |
-| ------------ | ----------- | ------- | ---------- | ------- |
-| UDP          | 8192        | 32      | 16.03 Gbps | 244,630 |
-| UDP          | 4096        | 32      | 8.40 Gbps  | 256,450 |
-| UDP          | 1472        | 64      | 2.60 Gbps  | 220,650 |
-| QUANTUM      | 4096        | -       | 1.95 Gbps  | 59,440  |
-| WS-DISCOVERY | -           | -       | 291 Mbps   | 260,510 |
-| DNS          | -           | -       | 68 Mbps    | 268,470 |
+**Performance numbers from localhost testing do NOT reflect real-world network performance.**
+
+Localhost tests measure CPU/memory speed, not actual network throughput. On real networks, expect significantly lower performance due to:
+
+- Network interface limitations
+- Python interpreter overhead
+- OS network stack processing
+- Network latency and congestion
+
+### Realistic Expectations
+
+| Environment      | Expected Throughput | Notes                          |
+| ---------------- | ------------------- | ------------------------------ |
+| Localhost        | High (theoretical)  | Not real network performance   |
+| Gigabit LAN      | 100-500 Mbps        | Depends on hardware            |
+| Home network     | 10-100 Mbps         | Typical for Python-based tools |
+| Internet targets | Varies              | Many limiting factors          |
 
 ### Scaling Factors
 
-- Thread count: Linear scaling up to CPU core count
+- Thread count: Some improvement up to CPU core count
 - Packet size: Larger packets = higher throughput
 - Protocol: UDP fastest, HTTP/HTTPS slower due to overhead
+- Python GIL: Limits true parallelism
 
 ---
 

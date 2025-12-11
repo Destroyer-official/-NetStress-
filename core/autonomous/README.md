@@ -2,30 +2,32 @@
 
 ## Overview
 
-The Autonomous Configuration and Optimization System is a comprehensive, AI-driven framework that provides intelligent auto-configuration, real-time parameter optimization, and performance prediction capabilities for the Advanced DDoS Testing Framework.
+The Autonomous Configuration and Optimization System provides intelligent auto-configuration, real-time parameter optimization, and performance prediction capabilities for the DDoS Testing Framework.
+
+**Note:** Despite some legacy naming (e.g., "Quantum"), this system uses standard probabilistic and genetic algorithms, not actual quantum computing or advanced AI.
 
 ## Components
 
 ### 1. Intelligent Parameter Optimization Engine (`optimization_engine.py`)
 
-#### QuantumOptimizationEngine
+#### QuantumOptimizationEngine (Legacy Name - Actually Genetic/Probabilistic)
 
-- **Quantum-inspired optimization algorithms** using superposition and entanglement principles
-- **Population-based optimization** with quantum rotation gates and entanglement operations
+- **Probabilistic genetic optimization** using population-based search
+- **Population-based optimization** with rotation transformations and crossover operations
 - **Adaptive convergence detection** with confidence scoring
 - **Multi-dimensional parameter space exploration**
 
 #### ParameterOptimizer
 
 - **Dynamic parameter adjustment** based on target responses
-- **Multiple optimization strategies**: quantum exploration, gradient-based optimization, fine-tuning
+- **Multiple optimization strategies**: probabilistic exploration, gradient-based optimization, fine-tuning
 - **Performance prediction modeling** with effectiveness scoring
 - **Momentum-based gradient descent** with learning rate adaptation
 - **Real-time optimization insights** and recommendations
 
 **Key Features:**
 
-- Quantum superposition for exploring multiple parameter states simultaneously
+- Probabilistic sampling for exploring multiple parameter states
 - Automatic strategy selection based on current performance levels
 - Continuous learning from attack feedback
 - Confidence-based decision making
@@ -34,7 +36,7 @@ The Autonomous Configuration and Optimization System is a comprehensive, AI-driv
 
 #### PerformancePredictionModel
 
-- **Neural network-based prediction** with forward pass implementation
+- **Simple feedforward network** with numpy-based forward pass (not deep learning)
 - **Feature extraction** from target profiles and attack parameters
 - **Multi-output prediction**: PPS, success rate, bandwidth utilization
 - **Confidence interval calculation** with uncertainty quantification
@@ -141,7 +143,7 @@ The autonomous system integrates with the main DDoS framework through:
 
 ### Test Coverage
 
-- ✅ Quantum optimization algorithms
+- ✅ Genetic/probabilistic optimization algorithms
 - ✅ Parameter optimization with feedback loops
 - ✅ Performance prediction accuracy
 - ✅ Real-time adaptation triggers and actions
@@ -179,7 +181,7 @@ bounds = {
     'concurrency': (10, 1000)
 }
 
-# Quantum optimization
+# Genetic optimization (legacy "Quantum" name)
 engine = QuantumOptimizationEngine(population_size=50)
 result = await engine.optimize(fitness_function, bounds)
 
@@ -193,7 +195,7 @@ cpu_allocation = resource_manager.allocate_resources(
 
 ### Optimization Performance
 
-- **Quantum optimization**: Converges in 10-100 iterations depending on complexity
+- **Genetic optimization**: Converges in 10-100 iterations depending on complexity
 - **Parameter optimization**: Real-time updates with <100ms latency
 - **Performance prediction**: Sub-millisecond prediction times
 - **Resource allocation**: Near-instantaneous allocation decisions
@@ -252,10 +254,9 @@ This implementation fulfills all requirements from the specification:
 
 ### Research Areas
 
-1. **Quantum Machine Learning**: True quantum computing integration when available
+1. **Advanced Optimization**: More sophisticated optimization algorithms
 2. **Adversarial Optimization**: Game-theoretic approaches for defense evasion
 3. **Swarm Intelligence**: Distributed coordination algorithms
-4. **Neuromorphic Computing**: Brain-inspired optimization architectures
 
 ## Conclusion
 

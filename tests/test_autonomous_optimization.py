@@ -114,7 +114,7 @@ class TestQuantumOptimizationEngine:
         # Effectiveness can slightly exceed 1.0 due to random noise in fitness function
         assert 0.0 <= result.predicted_effectiveness <= 1.5
         assert 0.0 <= result.confidence_score <= 1.0
-        assert result.optimization_method == "quantum_inspired"
+        assert result.optimization_method == "genetic_probabilistic"
         
         # Should find parameters with relatively high packet rate
         assert result.parameters.packet_rate > 500

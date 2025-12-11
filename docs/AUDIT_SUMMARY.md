@@ -68,8 +68,8 @@ Format:
 
 ```
 2025-12-09 10:30:00 | INFO | Attack started | target=192.168.1.100 | protocol=UDP
-2025-12-09 10:31:00 | INFO | Stats | pps=244630 | throughput=16.03Gbps
-2025-12-09 10:32:00 | INFO | Attack ended | duration=60s | total_packets=14677800
+2025-12-09 10:31:00 | INFO | Stats | pps=50000 | throughput=500Mbps
+2025-12-09 10:32:00 | INFO | Attack ended | duration=60s | total_packets=3000000
 ```
 
 ---

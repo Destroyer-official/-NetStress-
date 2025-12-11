@@ -1,8 +1,10 @@
 """
 Intelligent Parameter Optimization Engine
 
-Implements quantum-inspired optimization algorithms, dynamic parameter adjustment
+Implements probabilistic genetic optimization algorithms, dynamic parameter adjustment
 based on target responses, and performance prediction modeling.
+
+Note: This uses standard probabilistic optimization techniques, not actual quantum computing.
 """
 
 import asyncio
@@ -51,34 +53,37 @@ class OptimizationResult:
 
 class QuantumOptimizationEngine:
     """
-    Quantum-inspired optimization engine for attack parameter optimization.
+    Probabilistic genetic optimization engine for attack parameter optimization.
     
-    Uses quantum computing principles like superposition and entanglement
-    to explore parameter space efficiently.
+    Uses probabilistic sampling and evolutionary techniques to explore 
+    parameter space efficiently. Despite the name, this is a standard
+    genetic algorithm with probabilistic state representation.
+    
+    Note: The "quantum" naming is legacy - this uses classical algorithms.
     """
     
     def __init__(self, population_size: int = 50, max_iterations: int = 100):
         self.population_size = population_size
         self.max_iterations = max_iterations
-        self.quantum_population = []
+        self.quantum_population = []  # Legacy name - actually probabilistic population
         self.best_solution = None
         self.convergence_history = deque(maxlen=20)
         
     def initialize_quantum_population(self, bounds: Dict[str, Tuple[float, float]]):
-        """Initialize quantum population with superposition states"""
+        """Initialize population with probabilistic states for genetic optimization"""
         self.quantum_population = []
         
         for _ in range(self.population_size):
             individual = {}
             for param, (min_val, max_val) in bounds.items():
-                # Quantum superposition: each parameter exists in multiple states
+                # Probabilistic representation: normalized weights for sampling
                 individual[param] = {
-                    'alpha': random.uniform(0, 1),  # Probability amplitude for state 0
-                    'beta': random.uniform(0, 1),   # Probability amplitude for state 1
+                    'alpha': random.uniform(0, 1),  # Weight for lower bound
+                    'beta': random.uniform(0, 1),   # Weight for upper bound
                     'min_val': min_val,
                     'max_val': max_val
                 }
-                # Normalize amplitudes
+                # Normalize weights to sum to 1
                 norm = math.sqrt(individual[param]['alpha']**2 + individual[param]['beta']**2)
                 individual[param]['alpha'] /= norm
                 individual[param]['beta'] /= norm
@@ -86,21 +91,21 @@ class QuantumOptimizationEngine:
             self.quantum_population.append(individual)
     
     def collapse_quantum_state(self, individual: Dict) -> OptimizationParameters:
-        """Collapse quantum superposition to classical parameters"""
+        """Sample concrete parameters from probabilistic state"""
         params = {}
         
-        for param, quantum_state in individual.items():
-            # Quantum measurement - collapse to classical value
-            probability = quantum_state['alpha']**2
+        for param, prob_state in individual.items():
+            # Probabilistic sampling based on weights
+            probability = prob_state['alpha']**2
             if random.random() < probability:
-                value = quantum_state['min_val']
+                value = prob_state['min_val']
             else:
-                value = quantum_state['max_val']
+                value = prob_state['max_val']
             
-            # Add quantum noise for exploration
-            noise = random.gauss(0, 0.1) * (quantum_state['max_val'] - quantum_state['min_val'])
-            value = max(quantum_state['min_val'], 
-                       min(quantum_state['max_val'], value + noise))
+            # Add Gaussian noise for exploration
+            noise = random.gauss(0, 0.1) * (prob_state['max_val'] - prob_state['min_val'])
+            value = max(prob_state['min_val'], 
+                       min(prob_state['max_val'], value + noise))
             
             params[param] = value
         
@@ -112,11 +117,11 @@ class QuantumOptimizationEngine:
         )
     
     def quantum_rotation(self, individual: Dict, fitness: float, best_fitness: float):
-        """Apply quantum rotation gates based on fitness"""
+        """Apply rotation transformation to adjust probability weights based on fitness"""
         rotation_angle = 0.01 * math.pi * (best_fitness - fitness) / (best_fitness + 1e-10)
         
         for param in individual:
-            # Quantum rotation gate
+            # Rotation transformation (standard genetic algorithm technique)
             cos_theta = math.cos(rotation_angle)
             sin_theta = math.sin(rotation_angle)
             
@@ -127,23 +132,23 @@ class QuantumOptimizationEngine:
             individual[param]['beta'] = sin_theta * old_alpha + cos_theta * old_beta
     
     def quantum_entanglement(self, individual1: Dict, individual2: Dict) -> Tuple[Dict, Dict]:
-        """Create quantum entanglement between two individuals"""
-        entangled1 = individual1.copy()
-        entangled2 = individual2.copy()
+        """Crossover operation between two individuals (genetic algorithm crossover)"""
+        crossed1 = individual1.copy()
+        crossed2 = individual2.copy()
         
-        # Entangle random parameters
-        entangled_params = random.sample(list(individual1.keys()), 
+        # Select random parameters for crossover
+        crossover_params = random.sample(list(individual1.keys()), 
                                        k=random.randint(1, len(individual1)))
         
-        for param in entangled_params:
-            # Swap quantum amplitudes
-            entangled1[param]['alpha'], entangled2[param]['alpha'] = \
-                entangled2[param]['alpha'], entangled1[param]['alpha']
+        for param in crossover_params:
+            # Swap weights between individuals
+            crossed1[param]['alpha'], crossed2[param]['alpha'] = \
+                crossed2[param]['alpha'], crossed1[param]['alpha']
     
-        return entangled1, entangled2
+        return crossed1, crossed2
     
     async def optimize(self, fitness_function, bounds: Dict[str, Tuple[float, float]]) -> OptimizationResult:
-        """Main quantum optimization loop"""
+        """Main genetic optimization loop"""
         self.initialize_quantum_population(bounds)
         best_fitness = float('-inf')
         
@@ -160,19 +165,19 @@ class QuantumOptimizationEngine:
                     best_fitness = fitness
                     self.best_solution = params
             
-            # Apply quantum operations
+            # Apply genetic operations (rotation/mutation)
             for i, individual in enumerate(self.quantum_population):
                 self.quantum_rotation(individual, fitness_scores[i], best_fitness)
             
-            # Quantum entanglement between best individuals
+            # Crossover between best individuals
             if len(self.quantum_population) >= 2:
                 best_indices = np.argsort(fitness_scores)[-2:]
-                entangled1, entangled2 = self.quantum_entanglement(
+                crossed1, crossed2 = self.quantum_entanglement(
                     self.quantum_population[best_indices[0]],
                     self.quantum_population[best_indices[1]]
                 )
-                self.quantum_population[best_indices[0]] = entangled1
-                self.quantum_population[best_indices[1]] = entangled2
+                self.quantum_population[best_indices[0]] = crossed1
+                self.quantum_population[best_indices[1]] = crossed2
             
             self.convergence_history.append(best_fitness)
             
@@ -181,7 +186,7 @@ class QuantumOptimizationEngine:
                 recent_improvement = (self.convergence_history[-1] - 
                                     self.convergence_history[-10])
                 if recent_improvement < 0.001:
-                    logger.info(f"Quantum optimization converged at iteration {iteration}")
+                    logger.info(f"Genetic optimization converged at iteration {iteration}")
                     break
         
         confidence = self._calculate_confidence()
@@ -190,7 +195,7 @@ class QuantumOptimizationEngine:
             parameters=self.best_solution,
             predicted_effectiveness=best_fitness,
             confidence_score=confidence,
-            optimization_method="quantum_inspired"
+            optimization_method="genetic_probabilistic"
         )
     
     def _calculate_confidence(self) -> float:
