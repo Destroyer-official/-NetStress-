@@ -746,13 +746,428 @@ class PredictiveAnalyticsSystem:
         """Get prediction accuracy metrics"""
         return self.performance_predictor.get_prediction_accuracy()
 
+class TimeSeriesForecaster:
+    """Advanced time series forecasting for attack metrics"""
+    
+    def __init__(self, window_size: int = 100):
+        self.logger = logging.getLogger(__name__)
+        self.window_size = window_size
+        self.series_data: Dict[str, deque] = defaultdict(lambda: deque(maxlen=window_size))
+        self.trend_models: Dict[str, Dict] = {}
+        self.seasonality_detected: Dict[str, bool] = {}
+    
+    def add_observation(self, metric_name: str, value: float, timestamp: float = None):
+        """Add observation to time series"""
+        if timestamp is None:
+            timestamp = time.time()
+        
+        self.series_data[metric_name].append({
+            'value': value,
+            'timestamp': timestamp
+        })
+        
+        # Update trend model if enough data
+        if len(self.series_data[metric_name]) >= 20:
+            self._update_trend_model(metric_name)
+    
+    def _update_trend_model(self, metric_name: str):
+        """Update trend model for a metric"""
+        data = list(self.series_data[metric_name])
+        values = [d['value'] for d in data]
+        
+        # Simple linear regression for trend
+        n = len(values)
+        x = list(range(n))
+        x_mean = sum(x) / n
+        y_mean = sum(values) / n
+        
+        numerator = sum((x[i] - x_mean) * (values[i] - y_mean) for i in range(n))
+        denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
+        
+        if denominator > 0:
+            slope = numerator / denominator
+            intercept = y_mean - slope * x_mean
+        else:
+            slope = 0
+            intercept = y_mean
+        
+        # Calculate residuals for seasonality detection
+        residuals = [values[i] - (slope * i + intercept) for i in range(n)]
+        
+        self.trend_models[metric_name] = {
+            'slope': slope,
+            'intercept': intercept,
+            'last_index': n - 1,
+            'residual_std': statistics.stdev(residuals) if len(residuals) > 1 else 0
+        }
+    
+    def forecast(self, metric_name: str, steps: int = 10) -> List[Dict[str, float]]:
+        """Forecast future values"""
+        if metric_name not in self.trend_models:
+            return []
+        
+        model = self.trend_models[metric_name]
+        forecasts = []
+        
+        for i in range(1, steps + 1):
+            future_index = model['last_index'] + i
+            predicted = model['slope'] * future_index + model['intercept']
+            
+            # Add confidence interval
+            confidence = model['residual_std'] * 1.96  # 95% CI
+            
+            forecasts.append({
+                'step': i,
+                'predicted': predicted,
+                'lower_bound': predicted - confidence,
+                'upper_bound': predicted + confidence
+            })
+        
+        return forecasts
+    
+    def get_trend_direction(self, metric_name: str) -> str:
+        """Get trend direction for a metric"""
+        if metric_name not in self.trend_models:
+            return 'unknown'
+        
+        slope = self.trend_models[metric_name]['slope']
+        
+        if slope > 0.01:
+            return 'increasing'
+        elif slope < -0.01:
+            return 'decreasing'
+        return 'stable'
+
+
+class CorrelationAnalyzer:
+    """Analyze correlations between attack parameters and outcomes"""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.observations: List[Dict[str, float]] = []
+        self.correlation_matrix: Dict[str, Dict[str, float]] = {}
+        self.max_observations = 1000
+    
+    def add_observation(self, parameters: Dict[str, float], outcomes: Dict[str, float]):
+        """Add observation for correlation analysis"""
+        observation = {**parameters, **outcomes}
+        self.observations.append(observation)
+        
+        if len(self.observations) > self.max_observations:
+            self.observations = self.observations[-self.max_observations:]
+        
+        # Update correlations periodically
+        if len(self.observations) % 50 == 0:
+            self._update_correlations()
+    
+    def _update_correlations(self):
+        """Update correlation matrix"""
+        if len(self.observations) < 30:
+            return
+        
+        # Get all keys
+        all_keys = set()
+        for obs in self.observations:
+            all_keys.update(obs.keys())
+        
+        all_keys = list(all_keys)
+        
+        # Calculate correlations
+        for key1 in all_keys:
+            if key1 not in self.correlation_matrix:
+                self.correlation_matrix[key1] = {}
+            
+            for key2 in all_keys:
+                if key1 == key2:
+                    self.correlation_matrix[key1][key2] = 1.0
+                    continue
+                
+                # Get paired values
+                pairs = [(obs.get(key1, 0), obs.get(key2, 0)) 
+                        for obs in self.observations 
+                        if key1 in obs and key2 in obs]
+                
+                if len(pairs) < 10:
+                    continue
+                
+                x_vals = [p[0] for p in pairs]
+                y_vals = [p[1] for p in pairs]
+                
+                # Calculate Pearson correlation
+                corr = self._pearson_correlation(x_vals, y_vals)
+                self.correlation_matrix[key1][key2] = corr
+    
+    def _pearson_correlation(self, x: List[float], y: List[float]) -> float:
+        """Calculate Pearson correlation coefficient"""
+        n = len(x)
+        if n < 2:
+            return 0.0
+        
+        x_mean = sum(x) / n
+        y_mean = sum(y) / n
+        
+        numerator = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
+        
+        x_std = (sum((xi - x_mean) ** 2 for xi in x) / n) ** 0.5
+        y_std = (sum((yi - y_mean) ** 2 for yi in y) / n) ** 0.5
+        
+        if x_std == 0 or y_std == 0:
+            return 0.0
+        
+        return numerator / (n * x_std * y_std)
+    
+    def get_strongest_correlations(self, target: str, top_n: int = 5) -> List[Tuple[str, float]]:
+        """Get strongest correlations with a target variable"""
+        if target not in self.correlation_matrix:
+            return []
+        
+        correlations = [
+            (key, abs(corr)) 
+            for key, corr in self.correlation_matrix[target].items()
+            if key != target
+        ]
+        
+        correlations.sort(key=lambda x: x[1], reverse=True)
+        return correlations[:top_n]
+    
+    def get_parameter_impact(self, parameter: str, outcome: str) -> Dict[str, Any]:
+        """Get impact analysis of a parameter on an outcome"""
+        if parameter not in self.correlation_matrix:
+            return {'impact': 'unknown', 'correlation': 0}
+        
+        corr = self.correlation_matrix.get(parameter, {}).get(outcome, 0)
+        
+        if abs(corr) > 0.7:
+            impact = 'strong'
+        elif abs(corr) > 0.4:
+            impact = 'moderate'
+        elif abs(corr) > 0.2:
+            impact = 'weak'
+        else:
+            impact = 'negligible'
+        
+        return {
+            'impact': impact,
+            'correlation': corr,
+            'direction': 'positive' if corr > 0 else 'negative'
+        }
+
+
+class AdaptiveThresholdManager:
+    """Manage adaptive thresholds for anomaly detection"""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.thresholds: Dict[str, Dict[str, float]] = {}
+        self.threshold_history: Dict[str, List[float]] = defaultdict(list)
+        self.adaptation_rate = 0.05
+    
+    def update_threshold(self, metric_name: str, current_value: float, 
+                        is_anomaly: bool = False):
+        """Update threshold based on observed values"""
+        if metric_name not in self.thresholds:
+            self.thresholds[metric_name] = {
+                'upper': current_value * 1.5,
+                'lower': current_value * 0.5,
+                'mean': current_value,
+                'std': current_value * 0.1
+            }
+            return
+        
+        thresh = self.thresholds[metric_name]
+        
+        # Update mean with exponential moving average
+        thresh['mean'] = (1 - self.adaptation_rate) * thresh['mean'] + \
+                        self.adaptation_rate * current_value
+        
+        # Update std
+        deviation = abs(current_value - thresh['mean'])
+        thresh['std'] = (1 - self.adaptation_rate) * thresh['std'] + \
+                       self.adaptation_rate * deviation
+        
+        # Update bounds
+        thresh['upper'] = thresh['mean'] + 3 * thresh['std']
+        thresh['lower'] = max(0, thresh['mean'] - 3 * thresh['std'])
+        
+        # If this was flagged as anomaly but value is becoming common, widen bounds
+        if is_anomaly and deviation < thresh['std'] * 2:
+            thresh['upper'] *= 1.1
+            thresh['lower'] *= 0.9
+        
+        self.threshold_history[metric_name].append(thresh['upper'])
+        if len(self.threshold_history[metric_name]) > 100:
+            self.threshold_history[metric_name] = self.threshold_history[metric_name][-100:]
+    
+    def is_anomalous(self, metric_name: str, value: float) -> Tuple[bool, str]:
+        """Check if value is anomalous"""
+        if metric_name not in self.thresholds:
+            return False, 'no_baseline'
+        
+        thresh = self.thresholds[metric_name]
+        
+        if value > thresh['upper']:
+            return True, 'above_threshold'
+        elif value < thresh['lower']:
+            return True, 'below_threshold'
+        
+        return False, 'normal'
+    
+    def get_threshold_info(self, metric_name: str) -> Dict[str, Any]:
+        """Get threshold information for a metric"""
+        if metric_name not in self.thresholds:
+            return {}
+        
+        return {
+            **self.thresholds[metric_name],
+            'history_length': len(self.threshold_history.get(metric_name, []))
+        }
+
+
+class EnhancedPredictiveAnalyticsSystem(PredictiveAnalyticsSystem):
+    """
+    Enhanced predictive analytics with advanced ML-like capabilities.
+    
+    Features:
+    - Time series forecasting
+    - Correlation analysis
+    - Adaptive thresholds
+    - Multi-model ensemble predictions
+    """
+    
+    def __init__(self):
+        super().__init__()
+        
+        # Enhanced components
+        self.time_series_forecaster = TimeSeriesForecaster()
+        self.correlation_analyzer = CorrelationAnalyzer()
+        self.threshold_manager = AdaptiveThresholdManager()
+        
+        # Ensemble prediction weights
+        self.ensemble_weights = {
+            'random_forest': 0.4,
+            'trend': 0.3,
+            'correlation': 0.3
+        }
+        
+        self.logger.info("Enhanced Predictive Analytics System initialized")
+    
+    def add_metrics(self, metrics: Dict[str, float], config: Dict[str, Any] = None):
+        """Enhanced metrics addition with time series and correlation tracking"""
+        # Call parent method
+        super().add_metrics(metrics, config)
+        
+        # Add to time series
+        timestamp = time.time()
+        for metric_name, value in metrics.items():
+            self.time_series_forecaster.add_observation(metric_name, value, timestamp)
+            
+            # Update adaptive thresholds
+            is_anomaly, _ = self.threshold_manager.is_anomalous(metric_name, value)
+            self.threshold_manager.update_threshold(metric_name, value, is_anomaly)
+        
+        # Add to correlation analyzer
+        if config:
+            self.correlation_analyzer.add_observation(config, metrics)
+    
+    def get_ensemble_prediction(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Get ensemble prediction combining multiple methods"""
+        predictions = {}
+        
+        # Random Forest prediction
+        rf_prediction = self.performance_predictor.predict_performance(features)
+        predictions['random_forest'] = {
+            'pps': rf_prediction.predicted_pps,
+            'bandwidth': rf_prediction.predicted_bandwidth,
+            'success_rate': rf_prediction.predicted_success_rate
+        }
+        
+        # Trend-based prediction
+        pps_forecast = self.time_series_forecaster.forecast('pps', steps=1)
+        if pps_forecast:
+            predictions['trend'] = {
+                'pps': pps_forecast[0]['predicted'],
+                'bandwidth': predictions['random_forest']['bandwidth'],  # Fallback
+                'success_rate': predictions['random_forest']['success_rate']
+            }
+        else:
+            predictions['trend'] = predictions['random_forest']
+        
+        # Correlation-based adjustment
+        pps_correlations = self.correlation_analyzer.get_strongest_correlations('pps', top_n=3)
+        correlation_adjustment = 1.0
+        for param, corr in pps_correlations:
+            if param in features:
+                correlation_adjustment += corr * 0.1
+        
+        predictions['correlation'] = {
+            'pps': predictions['random_forest']['pps'] * correlation_adjustment,
+            'bandwidth': predictions['random_forest']['bandwidth'],
+            'success_rate': predictions['random_forest']['success_rate']
+        }
+        
+        # Ensemble combination
+        ensemble = {
+            'pps': sum(
+                predictions[method]['pps'] * weight 
+                for method, weight in self.ensemble_weights.items()
+            ),
+            'bandwidth': sum(
+                predictions[method]['bandwidth'] * weight 
+                for method, weight in self.ensemble_weights.items()
+            ),
+            'success_rate': sum(
+                predictions[method]['success_rate'] * weight 
+                for method, weight in self.ensemble_weights.items()
+            )
+        }
+        
+        return {
+            'ensemble': ensemble,
+            'individual_predictions': predictions,
+            'confidence': rf_prediction.confidence_interval
+        }
+    
+    def get_metric_forecast(self, metric_name: str, steps: int = 10) -> List[Dict[str, float]]:
+        """Get forecast for a specific metric"""
+        return self.time_series_forecaster.forecast(metric_name, steps)
+    
+    def get_parameter_correlations(self, outcome: str = 'pps') -> List[Tuple[str, float]]:
+        """Get parameter correlations with an outcome"""
+        return self.correlation_analyzer.get_strongest_correlations(outcome)
+    
+    def get_adaptive_thresholds(self) -> Dict[str, Dict[str, Any]]:
+        """Get all adaptive thresholds"""
+        return {
+            metric: self.threshold_manager.get_threshold_info(metric)
+            for metric in self.threshold_manager.thresholds.keys()
+        }
+    
+    def get_comprehensive_analysis(self, features: Dict[str, float], 
+                                  config: Dict[str, Any]) -> Dict[str, Any]:
+        """Get comprehensive analysis combining all capabilities"""
+        return {
+            'ensemble_prediction': self.get_ensemble_prediction(features),
+            'trend_directions': {
+                metric: self.time_series_forecaster.get_trend_direction(metric)
+                for metric in ['pps', 'bandwidth_utilization', 'success_rate', 'error_rate']
+            },
+            'parameter_impacts': {
+                param: self.correlation_analyzer.get_parameter_impact(param, 'pps')
+                for param in config.keys()
+            },
+            'anomaly_thresholds': self.get_adaptive_thresholds(),
+            'optimization_recommendations': self.get_optimization_recommendations(config, features),
+            'recent_anomalies': self.get_recent_anomalies(5)
+        }
+
+
 # Example usage and testing
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO)
     
-    # Create predictive analytics system
-    analytics = PredictiveAnalyticsSystem()
+    # Create enhanced predictive analytics system
+    analytics = EnhancedPredictiveAnalyticsSystem()
     analytics.start()
     
     try:
@@ -777,12 +1192,12 @@ if __name__ == "__main__":
             }
             
             analytics.add_metrics(metrics, config)
-            time.sleep(0.1)
+            time.sleep(0.05)
         
         # Wait for processing
         time.sleep(2)
         
-        # Test predictions
+        # Test enhanced predictions
         test_features = {
             'packet_rate': 5000,
             'packet_size': 1024,
@@ -793,20 +1208,17 @@ if __name__ == "__main__":
             'network_utilization': 0.6
         }
         
-        prediction = analytics.get_performance_prediction(test_features)
-        print(f"Performance Prediction: PPS={prediction.predicted_pps:.0f}, "
-              f"Bandwidth={prediction.predicted_bandwidth:.2f}, "
-              f"Success Rate={prediction.predicted_success_rate:.2f}")
+        # Get ensemble prediction
+        ensemble = analytics.get_ensemble_prediction(test_features)
+        print(f"Ensemble Prediction: PPS={ensemble['ensemble']['pps']:.0f}")
         
-        # Test recommendations
-        recommendations = analytics.get_optimization_recommendations(
-            {'packet_rate': 1000, 'thread_count': 2},
-            {'pps': 500, 'cpu_usage': 0.3}
-        )
-        
-        for rec in recommendations:
-            print(f"Recommendation: {rec.parameter} -> {rec.recommended_value} "
-                  f"(Expected improvement: {rec.expected_improvement:.1f}%)")
+        # Get comprehensive analysis
+        analysis = analytics.get_comprehensive_analysis(test_features, {
+            'packet_rate': 5000,
+            'packet_size': 1024,
+            'thread_count': 4
+        })
+        print(f"Trend Directions: {analysis['trend_directions']}")
         
     finally:
         analytics.stop()

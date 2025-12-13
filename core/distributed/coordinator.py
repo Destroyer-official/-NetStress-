@@ -3,16 +3,21 @@ Attack Coordinator
 
 High-level coordination for distributed attacks.
 Provides easy-to-use interface for multi-machine testing.
+
+Enhanced with:
+- Real-time statistics streaming (Requirement 7.3)
+- Load redistribution support (Requirement 7.4)
 """
 
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncIterator
 import logging
 
 from .controller import DistributedController, ControllerConfig
 from .protocol import AttackConfig, AgentStatus
+from .stats_aggregator import StatsAggregator, AggregatedStats
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +58,7 @@ class AttackCoordinator:
     - Easy attack configuration
     - Automatic agent management
     - Multi-phase attack support
-    - Real-time monitoring
+    - Real-time monitoring with streaming stats (Requirement 7.3)
     """
     
     def __init__(self, controller: Optional[DistributedController] = None):
@@ -69,18 +74,50 @@ class AttackCoordinator:
         self.total_stats: Dict[str, Any] = {}
         self._phase_stats: List[Dict[str, Any]] = []
         
+        # Real-time stats aggregator (Requirement 7.3)
+        self._stats_aggregator: Optional[StatsAggregator] = None
+        
     async def start_controller(self, config: Optional[ControllerConfig] = None):
         """Start a new controller if not provided"""
         if self.controller is None:
             self.controller = DistributedController(config)
             self._owns_controller = True
             await self.controller.start()
+        
+        # Start stats aggregator (Requirement 7.3)
+        self._stats_aggregator = StatsAggregator(
+            update_interval=config.stats_update_interval if config else 0.1,
+            history_size=config.stats_history_size if config else 1000,
+        )
+        await self._stats_aggregator.start()
+        
+        # Register stats callback with controller
+        if self.controller:
+            self.controller.on_stats_update(self._on_controller_stats)
             
     async def stop_controller(self):
         """Stop the controller if we own it"""
+        # Stop stats aggregator
+        if self._stats_aggregator:
+            await self._stats_aggregator.stop()
+            self._stats_aggregator = None
+        
         if self._owns_controller and self.controller:
             await self.controller.stop()
             self.controller = None
+    
+    def _on_controller_stats(self, stats: Dict[str, Any]):
+        """Callback for controller stats updates"""
+        # This is called synchronously, so we need to schedule the async update
+        if self._stats_aggregator and self.controller:
+            for agent in self.controller.get_agents():
+                asyncio.create_task(
+                    self._stats_aggregator.update_agent_stats(
+                        agent.agent_id,
+                        agent.current_stats,
+                        active=agent.status == AgentStatus.ATTACKING
+                    )
+                )
             
     async def wait_for_agents(self, count: int, timeout: float = 60.0) -> bool:
         """
@@ -275,6 +312,51 @@ class AttackCoordinator:
                 stats['progress'] = min(100, (stats['elapsed'] / self.current_attack.duration) * 100)
                 
         return stats
+    
+    # Real-time stats streaming (Requirement 7.3)
+    
+    async def stream_stats(self) -> AsyncIterator[AggregatedStats]:
+        """
+        Stream real-time aggregated statistics.
+        
+        Usage:
+            async for stats in coordinator.stream_stats():
+                print(f"PPS: {stats.total_pps}, Agents: {stats.active_agents}")
+        """
+        if not self._stats_aggregator:
+            return
+        
+        async for stats in self._stats_aggregator.stream():
+            # Add attack progress info
+            if self.attack_active and self.current_attack:
+                elapsed = time.time() - self.attack_start_time
+                # Note: AggregatedStats doesn't have these fields, 
+                # but we yield the stats object as-is
+            yield stats
+    
+    async def get_stats_history(self, count: int = 100) -> List[AggregatedStats]:
+        """Get historical aggregated statistics"""
+        if not self._stats_aggregator:
+            return []
+        return await self._stats_aggregator.get_history(count)
+    
+    def get_prometheus_metrics(self) -> str:
+        """Get current stats in Prometheus format"""
+        if self._stats_aggregator:
+            return self._stats_aggregator.get_prometheus_metrics()
+        return ""
+    
+    def get_json_metrics(self) -> str:
+        """Get current stats in JSON format"""
+        if self._stats_aggregator:
+            return self._stats_aggregator.get_json_metrics()
+        return "{}"
+    
+    def get_aggregated_stats(self) -> Optional[AggregatedStats]:
+        """Get current aggregated stats object"""
+        if self._stats_aggregator:
+            return self._stats_aggregator.get_current()
+        return None
 
 
 # Convenience functions for quick setup

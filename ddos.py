@@ -104,6 +104,7 @@ try:
         MLModelManager, AdaptiveStrategyEngine, DefenseDetectionAI,
         ModelValidator
     )
+    from core.ai.attack_insights import AttackInsightsGenerator
     AI_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: AI modules not available: {e}")
@@ -467,6 +468,84 @@ class AttackStats:
             else:
                 self.current_pps.value = max(INITIAL_PPS, int(self.current_pps.value * (1 - RATE_ADJUSTMENT_FACTOR)))
 
+    def collect_insights_data(self, config: Dict[str, Any] = None, 
+                            additional_metrics: Dict[str, float] = None):
+        """
+        Collect attack data for insights analysis.
+        
+        This method feeds attack performance data to the AI insights generator
+        to enable pattern analysis and optimization recommendations.
+        """
+        try:
+            # Get current performance report
+            report = self.report()
+            
+            # Prepare attack data for insights
+            attack_data = {
+                'timestamp': datetime.now(),
+                'pps': report['pps'],
+                'success_rate': max(0.0, 1.0 - (report['error_rate'] / 100.0)),
+                'bandwidth_utilization': report['mbps'] / 1000.0,  # Convert to Gbps
+                'error_rate': report['error_rate'] / 100.0,
+                'duration': report['duration'],
+                'packets_sent': report['packets_sent'],
+                'bytes_sent': report['bytes_sent'],
+                'config': config or {}
+            }
+            
+            # Add additional metrics if provided
+            if additional_metrics:
+                attack_data.update(additional_metrics)
+            
+            # Add system resource metrics if available
+            try:
+                import psutil
+                attack_data['cpu_usage'] = psutil.cpu_percent() / 100.0
+                attack_data['memory_usage'] = psutil.virtual_memory().percent / 100.0
+            except ImportError:
+                # Fallback values if psutil not available
+                attack_data['cpu_usage'] = 0.5  # Assume moderate usage
+                attack_data['memory_usage'] = 0.3
+            
+            # Feed data to AI optimizer for insights
+            if ai_optimizer and hasattr(ai_optimizer, 'add_attack_data'):
+                ai_optimizer.add_attack_data(attack_data)
+                logger.debug(f"Collected insights data: PPS={attack_data['pps']:.0f}, "
+                           f"Success={attack_data['success_rate']:.2%}")
+            
+        except Exception as e:
+            logger.error(f"Failed to collect insights data: {e}")
+
+    def get_attack_insights(self, min_confidence: float = 0.6) -> List[Dict[str, Any]]:
+        """Get AI-generated attack insights and recommendations"""
+        try:
+            if ai_optimizer and hasattr(ai_optimizer, 'generate_attack_insights'):
+                return ai_optimizer.generate_attack_insights(min_confidence)
+            else:
+                logger.warning("AI optimizer not available for insights generation")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to get attack insights: {e}")
+            return []
+
+    def get_optimization_recommendations(self, current_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Get AI-driven optimization recommendations"""
+        try:
+            if ai_optimizer and hasattr(ai_optimizer, 'get_optimization_recommendations'):
+                current_metrics = {
+                    'pps': self.report()['pps'],
+                    'success_rate': max(0.0, 1.0 - (self.report()['error_rate'] / 100.0)),
+                    'error_rate': self.report()['error_rate'] / 100.0,
+                    'bandwidth_utilization': self.report()['mbps'] / 1000.0
+                }
+                return ai_optimizer.get_optimization_recommendations(current_config, current_metrics)
+            else:
+                logger.warning("AI optimizer not available for recommendations")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to get optimization recommendations: {e}")
+            return []
+
 
 class AIOptimizer:
     """AI-based attack optimization with full core integration"""
@@ -477,6 +556,7 @@ class AIOptimizer:
         self.performance_predictor = None
         self.strategy_engine = None
         self.defense_ai = None
+        self.insights_generator = None
         
         # Initialize AI components
         if AI_AVAILABLE:
@@ -484,6 +564,7 @@ class AIOptimizer:
                 self.orchestrator = ai_orchestrator
                 self.strategy_engine = AdaptiveStrategyEngine()
                 self.defense_ai = DefenseDetectionAI()
+                self.insights_generator = AttackInsightsGenerator()
                 logger.info("AI Orchestrator initialized")
             except Exception as e:
                 logger.warning(f"AI Orchestrator init failed: {e}")
@@ -538,6 +619,135 @@ class AIOptimizer:
             except Exception:
                 pass
         return []
+
+    def add_attack_data(self, attack_data: Dict[str, Any]):
+        """Add attack performance data for insights analysis"""
+        if self.insights_generator:
+            try:
+                self.insights_generator.add_attack_data(attack_data)
+                logger.debug(f"Added attack data for insights: PPS={attack_data.get('pps', 0):.0f}")
+            except Exception as e:
+                logger.error(f"Failed to add attack data for insights: {e}")
+
+    def generate_attack_insights(self, min_confidence: float = 0.6) -> List[Dict[str, Any]]:
+        """
+        Generate actionable insights from attack effectiveness patterns.
+        
+        Analyzes accumulated attack data to identify:
+        - Performance patterns and trends
+        - Parameter correlations and effectiveness
+        - Defense mechanism detection
+        - Optimization opportunities
+        - Resource efficiency patterns
+        - Target behavior analysis
+        
+        Args:
+            min_confidence: Minimum confidence threshold for insights (0.0-1.0)
+            
+        Returns:
+            List of insight dictionaries with recommendations
+        """
+        if not self.insights_generator:
+            logger.warning("Attack insights generator not available")
+            return []
+        
+        try:
+            insights = self.insights_generator.generate_insights(min_confidence)
+            
+            # Convert insights to dictionaries for easier consumption
+            insights_data = []
+            for insight in insights:
+                insight_dict = insight.to_dict()
+                insights_data.append(insight_dict)
+            
+            logger.info(f"Generated {len(insights_data)} attack insights with confidence >= {min_confidence}")
+            
+            # Log high-impact insights
+            high_impact_insights = [i for i in insights_data if i['impact_score'] >= 70.0]
+            if high_impact_insights:
+                logger.info(f"Found {len(high_impact_insights)} high-impact insights:")
+                for insight in high_impact_insights[:3]:  # Log top 3
+                    logger.info(f"  • {insight['title']} (Impact: {insight['impact_score']:.1f})")
+            
+            return insights_data
+            
+        except Exception as e:
+            logger.error(f"Failed to generate attack insights: {e}")
+            return []
+
+    def get_optimization_recommendations(self, current_config: Dict[str, Any], 
+                                       current_metrics: Dict[str, float]) -> List[Dict[str, Any]]:
+        """
+        Get AI-driven optimization recommendations based on current performance.
+        
+        Args:
+            current_config: Current attack configuration parameters
+            current_metrics: Current performance metrics
+            
+        Returns:
+            List of optimization recommendations
+        """
+        recommendations = []
+        
+        try:
+            # Get insights-based recommendations
+            if self.insights_generator:
+                insights = self.insights_generator.generate_insights(min_confidence=0.5)
+                
+                # Extract optimization recommendations from insights
+                for insight in insights:
+                    if insight.insight_type.name in ['OPTIMIZATION_OPPORTUNITY', 'PARAMETER_CORRELATION']:
+                        rec_dict = {
+                            'type': 'insight_based',
+                            'title': insight.title,
+                            'description': insight.description,
+                            'recommendations': insight.recommendations,
+                            'confidence': insight.confidence,
+                            'impact_score': insight.impact_score,
+                            'supporting_data': insight.supporting_data
+                        }
+                        recommendations.append(rec_dict)
+            
+            # Get predictive analytics recommendations if available
+            if hasattr(self, 'performance_predictor') and self.performance_predictor:
+                try:
+                    # This would use the predictive analytics system
+                    pred_recommendations = []  # Placeholder for predictive recommendations
+                    recommendations.extend(pred_recommendations)
+                except Exception as e:
+                    logger.warning(f"Predictive recommendations failed: {e}")
+            
+            # Sort by impact score
+            recommendations.sort(key=lambda x: x.get('impact_score', 0), reverse=True)
+            
+            logger.info(f"Generated {len(recommendations)} optimization recommendations")
+            return recommendations[:10]  # Return top 10 recommendations
+            
+        except Exception as e:
+            logger.error(f"Failed to get optimization recommendations: {e}")
+            return []
+
+    def get_insights_summary(self) -> Dict[str, Any]:
+        """Get a summary of all generated insights"""
+        if not self.insights_generator:
+            return {'error': 'Insights generator not available'}
+        
+        try:
+            return self.insights_generator.get_insights_summary()
+        except Exception as e:
+            logger.error(f"Failed to get insights summary: {e}")
+            return {'error': str(e)}
+
+    def export_insights(self, format_type: str = 'json') -> str:
+        """Export insights in specified format"""
+        if not self.insights_generator:
+            return '{"error": "Insights generator not available"}'
+        
+        try:
+            return self.insights_generator.export_insights(format_type)
+        except Exception as e:
+            logger.error(f"Failed to export insights: {e}")
+            return f'{{"error": "{str(e)}"}}'
 
 
 class TargetAnalyzer:
@@ -856,6 +1066,112 @@ if SAFETY_AVAILABLE:
 def generate_random_ip() -> str:
     """Generate random IP for spoofing"""
     return '.'.join(str(random.randint(1, 254)) for _ in range(4))
+
+
+def display_attack_insights(min_confidence: float = 0.6, export_format: str = None):
+    """
+    Display comprehensive attack insights and recommendations.
+    
+    This function implements requirement 8.5 by analyzing effectiveness patterns
+    and generating actionable insights for manual parameter tuning.
+    
+    Args:
+        min_confidence: Minimum confidence threshold for insights (0.0-1.0)
+        export_format: Optional export format ('json' to export to file)
+    """
+    try:
+        logger.info("Generating attack insights...")
+        
+        # Generate insights
+        insights = stats.get_attack_insights(min_confidence)
+        
+        if not insights:
+            logger.info("No insights available. Run some attacks first to collect data.")
+            return
+        
+        # Display insights summary
+        summary = ai_optimizer.get_insights_summary()
+        logger.info(f"\n{'='*60}")
+        logger.info("ATTACK INSIGHTS SUMMARY")
+        logger.info(f"{'='*60}")
+        logger.info(f"Total insights: {summary.get('total_insights', 0)}")
+        logger.info(f"Data points analyzed: {summary.get('data_points_analyzed', 0)}")
+        logger.info(f"Average confidence: {summary.get('avg_confidence', 0):.2f}")
+        logger.info(f"Average impact: {summary.get('avg_impact', 0):.1f}")
+        
+        # Display insights by severity
+        by_severity = summary.get('by_severity', {})
+        if by_severity:
+            logger.info(f"\nInsights by severity:")
+            for severity, count in by_severity.items():
+                logger.info(f"  {severity.upper()}: {count}")
+        
+        # Display detailed insights
+        logger.info(f"\n{'='*60}")
+        logger.info("DETAILED INSIGHTS")
+        logger.info(f"{'='*60}")
+        
+        for i, insight in enumerate(insights, 1):
+            logger.info(f"\n{i}. {insight['title']}")
+            logger.info(f"   Type: {insight['insight_type']}")
+            logger.info(f"   Severity: {insight['severity'].upper()}")
+            logger.info(f"   Confidence: {insight['confidence']:.2f}")
+            logger.info(f"   Impact Score: {insight['impact_score']:.1f}")
+            logger.info(f"   Description: {insight['description']}")
+            
+            if insight['recommendations']:
+                logger.info(f"   Recommendations:")
+                for rec in insight['recommendations']:
+                    logger.info(f"     • {rec}")
+            
+            # Show supporting data for high-impact insights
+            if insight['impact_score'] >= 70.0 and insight.get('supporting_data'):
+                logger.info(f"   Supporting Data: {insight['supporting_data']}")
+        
+        # Get and display optimization recommendations
+        logger.info(f"\n{'='*60}")
+        logger.info("OPTIMIZATION RECOMMENDATIONS")
+        logger.info(f"{'='*60}")
+        
+        current_config = {
+            'packet_rate': stats.report().get('current_pps', 0),
+            'packet_size': 1024,
+            'thread_count': multiprocessing.cpu_count(),
+            'protocol': 'mixed'
+        }
+        
+        recommendations = stats.get_optimization_recommendations(current_config)
+        
+        if recommendations:
+            for i, rec in enumerate(recommendations, 1):
+                logger.info(f"\n{i}. {rec['title']}")
+                logger.info(f"   Type: {rec['type']}")
+                logger.info(f"   Confidence: {rec.get('confidence', 0):.2f}")
+                logger.info(f"   Impact Score: {rec.get('impact_score', 0):.1f}")
+                logger.info(f"   Description: {rec['description']}")
+                
+                if rec.get('recommendations'):
+                    logger.info(f"   Actions:")
+                    for action in rec['recommendations']:
+                        logger.info(f"     • {action}")
+        else:
+            logger.info("No optimization recommendations available.")
+        
+        # Export if requested
+        if export_format == 'json':
+            try:
+                export_data = ai_optimizer.export_insights('json')
+                filename = f"attack_insights_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(filename, 'w') as f:
+                    f.write(export_data)
+                logger.info(f"\nInsights exported to: {filename}")
+            except Exception as e:
+                logger.error(f"Failed to export insights: {e}")
+        
+        logger.info(f"\n{'='*60}")
+        
+    except Exception as e:
+        logger.error(f"Failed to display attack insights: {e}")
 
 
 async def tcp_flood(target: str, port: int, packet_size: int = 1024, spoof_source: bool = False):
@@ -1702,7 +2018,7 @@ async def quantum_flood(target: str, port: int, packet_size: int = 1024):
 
 
 async def stats_reporter():
-    """Report attack statistics"""
+    """Report attack statistics and collect insights data"""
     while True:
         await asyncio.sleep(STATS_INTERVAL)
         report = stats.report()
@@ -1711,10 +2027,28 @@ async def stats_reporter():
             f"Errors: {report['errors']} ({report['error_rate']}%) | "
             f"TCP: {report['tcp_syn_pps']} | UDP: {report['udp_pps']} | HTTP: {report['http_rps']}"
         )
+        
+        # Collect data for attack insights analysis
+        try:
+            # Get current configuration (simplified for now)
+            current_config = {
+                'packet_rate': report.get('current_pps', 0),
+                'packet_size': 1024,  # Default, could be made configurable
+                'thread_count': multiprocessing.cpu_count(),
+                'protocol': 'mixed'  # Since we're running multiple protocols
+            }
+            
+            # Collect insights data
+            stats.collect_insights_data(current_config)
+            
+        except Exception as e:
+            logger.debug(f"Failed to collect insights data: {e}")
 
 
 async def ai_optimizer_task(target: str):
-    """AI optimization background task"""
+    """AI optimization background task with insights generation"""
+    insights_counter = 0
+    
     while True:
         await asyncio.sleep(5.0)
         
@@ -1722,6 +2056,7 @@ async def ai_optimizer_task(target: str):
         target_response = {'response_time': 100, 'status_code': 200}
         network_conditions = {'latency': 50, 'bandwidth': 1e9}
         
+        # Run AI optimization
         optimized = ai_optimizer.optimize_with_ai(
             {'packet_rate': current_stats['pps']},
             current_stats,
@@ -1730,6 +2065,44 @@ async def ai_optimizer_task(target: str):
         )
         
         logger.debug(f"AI optimization: {optimized}")
+        
+        # Generate attack insights every 30 seconds (6 cycles)
+        insights_counter += 1
+        if insights_counter >= 6:
+            insights_counter = 0
+            try:
+                # Generate attack insights
+                insights = stats.get_attack_insights(min_confidence=0.6)
+                
+                if insights:
+                    logger.info(f"Generated {len(insights)} attack insights:")
+                    
+                    # Log top 3 insights
+                    for insight in insights[:3]:
+                        logger.info(f"  • {insight['title']} (Impact: {insight['impact_score']:.1f}, "
+                                  f"Confidence: {insight['confidence']:.2f})")
+                        
+                        # Log first recommendation for high-impact insights
+                        if insight['impact_score'] >= 70.0 and insight['recommendations']:
+                            logger.info(f"    Recommendation: {insight['recommendations'][0]}")
+                
+                # Get optimization recommendations
+                current_config = {
+                    'packet_rate': current_stats.get('current_pps', 0),
+                    'packet_size': 1024,
+                    'thread_count': multiprocessing.cpu_count(),
+                    'protocol': 'mixed'
+                }
+                
+                recommendations = stats.get_optimization_recommendations(current_config)
+                
+                if recommendations:
+                    logger.info(f"Generated {len(recommendations)} optimization recommendations:")
+                    for rec in recommendations[:2]:  # Log top 2
+                        logger.info(f"  • {rec['title']} (Impact: {rec.get('impact_score', 0):.1f})")
+                        
+            except Exception as e:
+                logger.debug(f"Failed to generate insights: {e}")
 
 
 async def run_attack(target: str, port: int, protocol: str, duration: int, 
@@ -1903,6 +2276,11 @@ Protocols: TCP, UDP, HTTP, HTTPS, DNS, ICMP, SLOW, QUANTUM,
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--ai-optimize', action='store_true', help='Enable AI-based attack optimization')
     parser.add_argument('--status', action='store_true', help='Show system status')
+    parser.add_argument('--insights', action='store_true', help='Generate and display attack insights')
+    parser.add_argument('--insights-confidence', type=float, default=0.6, 
+                       help='Minimum confidence threshold for insights (0.0-1.0, default: 0.6)')
+    parser.add_argument('--export-insights', choices=['json'], 
+                       help='Export insights to file in specified format')
     
     args = parser.parse_args()
     
@@ -1976,6 +2354,14 @@ Protocols: TCP, UDP, HTTP, HTTPS, DNS, ICMP, SLOW, QUANTUM,
         print("For true kernel bypass, use: DPDK, XDP-tools, PF_RING")
         print("For detailed capabilities, see: docs/CAPABILITIES.md")
         print("="*60 + "\n")
+        return
+    
+    # Handle insights command
+    if args.insights:
+        display_attack_insights(
+            min_confidence=args.insights_confidence,
+            export_format=args.export_insights
+        )
         return
     
     # Check required arguments for attack

@@ -322,3 +322,179 @@ class AdaptiveShaper(TrafficShaper):
         self.detection_score = 0.0
         
         logger.info(f"Switched to profile: {self.config.profile.value}")
+
+
+class AdvancedEvasionShaper(AdaptiveShaper):
+    """
+    Advanced evasion shaper with ML-inspired pattern generation.
+    
+    Features:
+    - Markov chain-based timing patterns
+    - Entropy-maximizing payload variations
+    - Protocol-aware traffic mimicry
+    - Real-time defense detection response
+    """
+    
+    def __init__(self, config: Optional[ShapingConfig] = None):
+        super().__init__(config)
+        
+        # Markov chain transition probabilities for timing
+        self._timing_states = ['fast', 'medium', 'slow', 'pause']
+        self._current_timing_state = 'medium'
+        self._transition_matrix = {
+            'fast': {'fast': 0.6, 'medium': 0.3, 'slow': 0.08, 'pause': 0.02},
+            'medium': {'fast': 0.25, 'medium': 0.5, 'slow': 0.2, 'pause': 0.05},
+            'slow': {'fast': 0.1, 'medium': 0.3, 'slow': 0.5, 'pause': 0.1},
+            'pause': {'fast': 0.3, 'medium': 0.4, 'slow': 0.25, 'pause': 0.05},
+        }
+        
+        # Defense detection state
+        self._defense_signatures = {
+            'rate_limit': {'error_burst': 0, 'last_seen': 0},
+            'waf': {'blocked_count': 0, 'pattern_detected': False},
+            'behavioral': {'anomaly_score': 0.0},
+        }
+        
+        # Protocol mimicry patterns (based on real traffic analysis)
+        self._browser_patterns = {
+            'chrome': {'burst_size': (3, 8), 'think_time': (0.5, 3.0), 'parallel_conn': 6},
+            'firefox': {'burst_size': (2, 6), 'think_time': (0.8, 4.0), 'parallel_conn': 4},
+            'safari': {'burst_size': (2, 5), 'think_time': (1.0, 5.0), 'parallel_conn': 4},
+            'mobile': {'burst_size': (1, 4), 'think_time': (2.0, 8.0), 'parallel_conn': 2},
+        }
+        self._current_browser = 'chrome'
+        
+    def get_delay(self) -> float:
+        """Get delay using Markov chain timing model"""
+        # Transition to next timing state
+        self._transition_timing_state()
+        
+        # Get base delay from parent
+        base_delay = super().get_delay()
+        
+        # Apply state-specific modifications
+        state_multipliers = {
+            'fast': 0.3,
+            'medium': 1.0,
+            'slow': 2.5,
+            'pause': 10.0,
+        }
+        
+        delay = base_delay * state_multipliers.get(self._current_timing_state, 1.0)
+        
+        # Add entropy-maximizing noise
+        entropy_noise = self._generate_entropy_noise()
+        delay *= (1.0 + entropy_noise)
+        
+        return max(0.0001, delay)
+    
+    def _transition_timing_state(self):
+        """Transition to next timing state using Markov chain"""
+        probs = self._transition_matrix[self._current_timing_state]
+        r = random.random()
+        cumulative = 0.0
+        
+        for state, prob in probs.items():
+            cumulative += prob
+            if r <= cumulative:
+                self._current_timing_state = state
+                break
+    
+    def _generate_entropy_noise(self) -> float:
+        """Generate high-entropy noise to avoid pattern detection"""
+        # Combine multiple random sources for higher entropy
+        sources = [
+            random.gauss(0, 0.1),  # Gaussian
+            random.uniform(-0.1, 0.1),  # Uniform
+            (random.random() ** 2 - 0.5) * 0.2,  # Quadratic
+        ]
+        
+        # Mix sources with time-varying weights
+        t = time.time() % 10.0
+        weights = [
+            math.sin(t * 0.5) * 0.5 + 0.5,
+            math.cos(t * 0.7) * 0.5 + 0.5,
+            math.sin(t * 1.1 + 1.0) * 0.5 + 0.5,
+        ]
+        
+        total_weight = sum(weights)
+        noise = sum(s * w for s, w in zip(sources, weights)) / total_weight
+        
+        return noise
+    
+    def mimic_browser(self, browser: str = 'chrome') -> Dict[str, Any]:
+        """Get traffic pattern mimicking specific browser"""
+        if browser not in self._browser_patterns:
+            browser = 'chrome'
+        
+        self._current_browser = browser
+        pattern = self._browser_patterns[browser]
+        
+        return {
+            'burst_size': random.randint(*pattern['burst_size']),
+            'think_time': random.uniform(*pattern['think_time']),
+            'parallel_connections': pattern['parallel_conn'],
+        }
+    
+    def detect_defense(self, response_code: int, response_time: float, 
+                       error_message: str = '') -> str:
+        """Detect type of defense based on response characteristics"""
+        now = time.time()
+        
+        # Rate limiting detection
+        if response_code == 429 or 'rate' in error_message.lower():
+            self._defense_signatures['rate_limit']['error_burst'] += 1
+            self._defense_signatures['rate_limit']['last_seen'] = now
+            if self._defense_signatures['rate_limit']['error_burst'] > 3:
+                return 'rate_limit'
+        
+        # WAF detection
+        if response_code in (403, 406, 418) or any(
+            sig in error_message.lower() 
+            for sig in ['blocked', 'forbidden', 'waf', 'firewall', 'cloudflare', 'akamai']
+        ):
+            self._defense_signatures['waf']['blocked_count'] += 1
+            if self._defense_signatures['waf']['blocked_count'] > 2:
+                return 'waf'
+        
+        # Behavioral analysis detection (unusual response patterns)
+        if response_time > 5.0 or response_code == 503:
+            self._defense_signatures['behavioral']['anomaly_score'] += 0.5
+            if self._defense_signatures['behavioral']['anomaly_score'] > 2.0:
+                return 'behavioral'
+        
+        # Decay old signatures
+        if now - self._defense_signatures['rate_limit']['last_seen'] > 10:
+            self._defense_signatures['rate_limit']['error_burst'] = max(
+                0, self._defense_signatures['rate_limit']['error_burst'] - 1
+            )
+        
+        self._defense_signatures['behavioral']['anomaly_score'] *= 0.95
+        
+        return 'none'
+    
+    def evade_defense(self, defense_type: str):
+        """Apply evasion strategy for detected defense"""
+        logger.info(f"Evading {defense_type} defense")
+        
+        if defense_type == 'rate_limit':
+            # Reduce rate and add more jitter
+            self.config.max_rate = int(self.config.max_rate * 0.5)
+            self.config.jitter_percent = min(0.8, self.config.jitter_percent + 0.2)
+            self.config.profile = ShapingProfile.STEALTHY
+            
+        elif defense_type == 'waf':
+            # Switch to mimicry mode with browser patterns
+            self.config.profile = ShapingProfile.MIMICRY
+            self._current_browser = random.choice(list(self._browser_patterns.keys()))
+            
+        elif defense_type == 'behavioral':
+            # Maximize randomness
+            self.config.profile = ShapingProfile.RANDOM
+            self.config.jitter_percent = 0.5
+            
+        # Reset detection signatures
+        self._defense_signatures[defense_type] = {
+            'error_burst': 0, 'last_seen': 0, 'blocked_count': 0, 
+            'pattern_detected': False, 'anomaly_score': 0.0
+        }.get(defense_type, {})

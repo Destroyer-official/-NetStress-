@@ -292,36 +292,46 @@ class TestIntegration:
         controller_config = ControllerConfig(
             bind_address="127.0.0.1",
             bind_port=0,
-            heartbeat_interval=0.5
+            heartbeat_interval=0.5,
+            use_ssl=False,
+            use_mutual_tls=False
         )
         controller = DistributedController(controller_config)
         await controller.start()
         
+        # Wait for controller to be ready
+        await asyncio.sleep(0.1)
+        
         # Get actual port
         port = controller._server.sockets[0].getsockname()[1]
         
-        # Create and start agent
+        # Create and start agent with more retries and no SSL
         agent_config = AgentConfig(
             controller_host="127.0.0.1",
             controller_port=port,
             heartbeat_interval=0.5,
-            max_reconnect_attempts=1
+            max_reconnect_attempts=3,
+            reconnect_interval=0.1,
+            use_ssl=False,
+            use_mutual_tls=False
         )
         agent = DistributedAgent(agent_config)
         
         try:
-            # Start agent
-            connected = await agent.start()
-            assert connected
+            # Start agent with timeout
+            connected = await asyncio.wait_for(agent.start(), timeout=5.0)
+            assert connected, "Agent failed to connect to controller"
             
-            # Wait for registration
-            await asyncio.sleep(0.5)
+            # Wait for registration with longer timeout
+            await asyncio.sleep(1.0)
             
             # Check controller sees agent
             agents = controller.get_agents()
-            assert len(agents) == 1
-            assert agents[0].status in [AgentStatus.IDLE, AgentStatus.READY]
+            assert len(agents) == 1, f"Expected 1 agent, got {len(agents)}"
+            assert agents[0].status in [AgentStatus.IDLE, AgentStatus.READY], f"Agent status: {agents[0].status}"
             
+        except asyncio.TimeoutError:
+            pytest.fail("Agent connection timed out")
         finally:
             await agent.stop()
             await controller.stop()

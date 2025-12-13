@@ -1,6 +1,9 @@
-# Destroyer-DoS Framework - Requirements
+# NetStress Framework - Production Requirements
+# Version: 2.0.0 (Power Trio)
 
-# Core dependencies
+# =============================================================================
+# Core Dependencies (Required)
+# =============================================================================
 aiohttp>=3.8.0
 numpy>=1.21.0
 scapy>=2.4.5
@@ -11,17 +14,49 @@ psutil>=5.8.0
 colorama>=0.4.4
 requests>=2.27.0
 
-# Optional: ML features (uncomment if needed)
+# =============================================================================
+# Testing (Required for development)
+# =============================================================================
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+hypothesis>=6.0.0
+
+# =============================================================================
+# Native Engine Build (Optional - for maximum performance)
+# =============================================================================
+# Install maturin to build the Rust native engine:
+# pip install maturin
+# cd native/rust_engine && maturin develop --release
+
+# =============================================================================
+# ML/AI Features (Optional)
+# =============================================================================
+# Uncomment for AI-powered attack optimization:
 # scikit-learn>=1.0.0
-# tensorflow>=2.8.0
-# torch>=1.11.0
+# torch>=2.0.0
 
-# Optional: Web interface (uncomment if needed)
-# fastapi>=0.75.0
-# uvicorn>=0.17.0
-# dash>=2.3.0
+# =============================================================================
+# Web Interface (Optional)
+# =============================================================================
+# Uncomment for web dashboard:
+# fastapi>=0.100.0
+# uvicorn>=0.22.0
+# dash>=2.10.0
+# plotly>=5.14.0
 
-# Development (uncomment if needed)
-# pytest>=7.0.0
-# black>=22.0.0
-# flake8>=4.0.0
+# =============================================================================
+# Development Tools (Optional)
+# =============================================================================
+# Uncomment for development:
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0
+# isort>=5.12.0
+
+# =============================================================================
+# Documentation (Optional)
+# =============================================================================
+# Uncomment for documentation generation:
+# sphinx>=6.0.0
+# sphinx-rtd-theme>=1.2.0

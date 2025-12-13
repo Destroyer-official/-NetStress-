@@ -68,6 +68,13 @@ class QuantumOptimizationEngine:
         self.quantum_population = []  # Legacy name - actually probabilistic population
         self.best_solution = None
         self.convergence_history = deque(maxlen=20)
+        self.fitness_history = deque(maxlen=50)
+        self.mutation_rate = 0.1  # Initial mutation rate
+        self.min_mutation_rate = 0.01
+        self.max_mutation_rate = 0.3
+        self.convergence_threshold = 0.001
+        self.stagnation_counter = 0
+        self.diversity_history = deque(maxlen=10)
         
     def initialize_quantum_population(self, bounds: Dict[str, Tuple[float, float]]):
         """Initialize population with probabilistic states for genetic optimization"""
@@ -117,19 +124,33 @@ class QuantumOptimizationEngine:
         )
     
     def quantum_rotation(self, individual: Dict, fitness: float, best_fitness: float):
-        """Apply rotation transformation to adjust probability weights based on fitness"""
-        rotation_angle = 0.01 * math.pi * (best_fitness - fitness) / (best_fitness + 1e-10)
+        """Apply rotation transformation to adjust probability weights based on fitness with adaptive mutation"""
+        # Base rotation angle adjusted by adaptive mutation rate
+        base_rotation = 0.01 * math.pi * (best_fitness - fitness) / (best_fitness + 1e-10)
+        adaptive_rotation = base_rotation * self.mutation_rate
         
         for param in individual:
-            # Rotation transformation (standard genetic algorithm technique)
-            cos_theta = math.cos(rotation_angle)
-            sin_theta = math.sin(rotation_angle)
+            # Rotation transformation with adaptive mutation
+            cos_theta = math.cos(adaptive_rotation)
+            sin_theta = math.sin(adaptive_rotation)
             
             old_alpha = individual[param]['alpha']
             old_beta = individual[param]['beta']
             
             individual[param]['alpha'] = cos_theta * old_alpha - sin_theta * old_beta
             individual[param]['beta'] = sin_theta * old_alpha + cos_theta * old_beta
+            
+            # Apply additional random mutation based on adaptive rate
+            if random.random() < self.mutation_rate:
+                mutation_strength = self.mutation_rate * 0.5
+                individual[param]['alpha'] += random.gauss(0, mutation_strength)
+                individual[param]['beta'] += random.gauss(0, mutation_strength)
+                
+                # Renormalize after mutation
+                norm = math.sqrt(individual[param]['alpha']**2 + individual[param]['beta']**2)
+                if norm > 0:
+                    individual[param]['alpha'] /= norm
+                    individual[param]['beta'] /= norm
     
     def quantum_entanglement(self, individual1: Dict, individual2: Dict) -> Tuple[Dict, Dict]:
         """Crossover operation between two individuals (genetic algorithm crossover)"""
@@ -180,13 +201,21 @@ class QuantumOptimizationEngine:
                 self.quantum_population[best_indices[1]] = crossed2
             
             self.convergence_history.append(best_fitness)
+            self.fitness_history.append(best_fitness)
+            
+            # Calculate population diversity
+            diversity = self._calculate_population_diversity()
+            self.diversity_history.append(diversity)
+            
+            # Adapt mutation rate based on convergence speed and diversity
+            self._adapt_mutation_rate(iteration)
             
             # Check convergence
             if len(self.convergence_history) >= 10:
                 recent_improvement = (self.convergence_history[-1] - 
                                     self.convergence_history[-10])
-                if recent_improvement < 0.001:
-                    logger.info(f"Genetic optimization converged at iteration {iteration}")
+                if recent_improvement < self.convergence_threshold:
+                    logger.info(f"Genetic optimization converged at iteration {iteration} with mutation rate {self.mutation_rate:.4f}")
                     break
         
         confidence = self._calculate_confidence()
@@ -195,7 +224,7 @@ class QuantumOptimizationEngine:
             parameters=self.best_solution,
             predicted_effectiveness=best_fitness,
             confidence_score=confidence,
-            optimization_method="genetic_probabilistic"
+            optimization_method=f"adaptive_genetic_probabilistic_mr{self.mutation_rate:.3f}"
         )
     
     def _calculate_confidence(self) -> float:
@@ -210,6 +239,104 @@ class QuantumOptimizationEngine:
         # Lower variance relative to mean indicates higher confidence
         confidence = 1.0 / (1.0 + variance / (mean_value + 1e-10))
         return min(1.0, max(0.0, confidence))
+    
+    def _calculate_population_diversity(self) -> float:
+        """Calculate population diversity to guide mutation rate adaptation"""
+        if len(self.quantum_population) < 2:
+            return 1.0
+        
+        total_diversity = 0.0
+        comparisons = 0
+        
+        # Compare all pairs of individuals
+        for i in range(len(self.quantum_population)):
+            for j in range(i + 1, len(self.quantum_population)):
+                individual1 = self.quantum_population[i]
+                individual2 = self.quantum_population[j]
+                
+                # Calculate parameter-wise diversity
+                param_diversity = 0.0
+                for param in individual1:
+                    # Euclidean distance between probability vectors
+                    alpha_diff = individual1[param]['alpha'] - individual2[param]['alpha']
+                    beta_diff = individual1[param]['beta'] - individual2[param]['beta']
+                    param_diversity += math.sqrt(alpha_diff**2 + beta_diff**2)
+                
+                total_diversity += param_diversity / len(individual1)
+                comparisons += 1
+        
+        return total_diversity / comparisons if comparisons > 0 else 1.0
+    
+    def _adapt_mutation_rate(self, iteration: int):
+        """Adapt mutation rate based on convergence speed and population diversity"""
+        # Calculate convergence speed
+        convergence_speed = self._calculate_convergence_speed()
+        
+        # Get current diversity
+        current_diversity = self.diversity_history[-1] if self.diversity_history else 1.0
+        
+        # Calculate average diversity over recent iterations
+        avg_diversity = np.mean(list(self.diversity_history)) if len(self.diversity_history) > 3 else current_diversity
+        
+        # Adaptation strategy
+        if convergence_speed < 0.001 and current_diversity < 0.1:
+            # Stagnation detected - increase mutation rate for exploration
+            self.stagnation_counter += 1
+            if self.stagnation_counter > 3:
+                self.mutation_rate = min(self.max_mutation_rate, self.mutation_rate * 1.5)
+                self.stagnation_counter = 0
+                logger.debug(f"Increased mutation rate to {self.mutation_rate:.4f} due to stagnation")
+        
+        elif convergence_speed > 0.01:
+            # Fast convergence - reduce mutation rate for exploitation
+            self.mutation_rate = max(self.min_mutation_rate, self.mutation_rate * 0.9)
+            self.stagnation_counter = 0
+            logger.debug(f"Decreased mutation rate to {self.mutation_rate:.4f} due to fast convergence")
+        
+        elif current_diversity < avg_diversity * 0.5:
+            # Diversity loss - increase mutation rate
+            self.mutation_rate = min(self.max_mutation_rate, self.mutation_rate * 1.2)
+            logger.debug(f"Increased mutation rate to {self.mutation_rate:.4f} due to diversity loss")
+        
+        elif current_diversity > avg_diversity * 1.5:
+            # High diversity - can reduce mutation rate slightly
+            self.mutation_rate = max(self.min_mutation_rate, self.mutation_rate * 0.95)
+            logger.debug(f"Decreased mutation rate to {self.mutation_rate:.4f} due to high diversity")
+        
+        # Adaptive schedule based on iteration progress
+        progress = iteration / self.max_iterations
+        if progress > 0.8:  # Late in optimization - reduce mutation for fine-tuning
+            schedule_factor = 0.5 + 0.5 * (1.0 - progress)
+            self.mutation_rate *= schedule_factor
+            self.mutation_rate = max(self.min_mutation_rate, self.mutation_rate)
+    
+    def _calculate_convergence_speed(self) -> float:
+        """Calculate the speed of convergence based on recent fitness improvements"""
+        if len(self.fitness_history) < 5:
+            return 0.0
+        
+        recent_fitness = list(self.fitness_history)[-5:]
+        
+        # Calculate linear regression slope as convergence speed
+        x = np.arange(len(recent_fitness))
+        y = np.array(recent_fitness)
+        
+        if len(x) < 2:
+            return 0.0
+        
+        # Simple linear regression
+        n = len(x)
+        sum_x = np.sum(x)
+        sum_y = np.sum(y)
+        sum_xy = np.sum(x * y)
+        sum_x2 = np.sum(x * x)
+        
+        denominator = n * sum_x2 - sum_x * sum_x
+        if abs(denominator) < 1e-10:
+            return 0.0
+        
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
+        return max(0.0, slope)  # Only positive slopes indicate improvement
 
 class ParameterOptimizer:
     """
@@ -253,24 +380,167 @@ class ParameterOptimizer:
     def _calculate_effectiveness(self, 
                                response: TargetResponse, 
                                metrics: Dict[str, float]) -> float:
-        """Calculate overall attack effectiveness score"""
-        # Weighted combination of multiple factors
+        """Calculate overall attack effectiveness score using multi-objective optimization"""
+        return self._calculate_multi_objective_fitness(response, metrics)
+    
+    def _calculate_multi_objective_fitness(self,
+                                         response: TargetResponse,
+                                         metrics: Dict[str, float]) -> float:
+        """
+        Multi-objective fitness function considering:
+        1. Attack effectiveness (success rate, bandwidth utilization)
+        2. Resource efficiency (CPU usage, memory consumption)
+        3. Stealth (error rate, detection avoidance)
+        4. Sustainability (connection stability, rate consistency)
+        """
+        # Objective 1: Attack Effectiveness
+        effectiveness_score = self._calculate_effectiveness_objective(response, metrics)
+        
+        # Objective 2: Resource Efficiency
+        efficiency_score = self._calculate_efficiency_objective(response, metrics)
+        
+        # Objective 3: Stealth
+        stealth_score = self._calculate_stealth_objective(response, metrics)
+        
+        # Objective 4: Sustainability
+        sustainability_score = self._calculate_sustainability_objective(response, metrics)
+        
+        # Weighted combination with adaptive weights based on context
+        weights = self._get_adaptive_weights(response, metrics)
+        
+        total_fitness = (
+            weights['effectiveness'] * effectiveness_score +
+            weights['efficiency'] * efficiency_score +
+            weights['stealth'] * stealth_score +
+            weights['sustainability'] * sustainability_score
+        )
+        
+        return max(0.0, min(1.0, total_fitness))
+    
+    def _calculate_effectiveness_objective(self, 
+                                         response: TargetResponse,
+                                         metrics: Dict[str, float]) -> float:
+        """Calculate attack effectiveness objective"""
+        # Primary effectiveness metrics
+        success_component = response.success_rate * 0.4
+        bandwidth_component = response.bandwidth_utilization * 0.3
+        throughput_component = min(1.0, metrics.get('pps', 0) / 50000) * 0.2
+        connection_component = response.connection_success * 0.1
+        
+        return success_component + bandwidth_component + throughput_component + connection_component
+    
+    def _calculate_efficiency_objective(self,
+                                      response: TargetResponse,
+                                      metrics: Dict[str, float]) -> float:
+        """Calculate resource efficiency objective"""
+        # Resource utilization metrics (lower is better for efficiency)
+        cpu_efficiency = 1.0 - min(1.0, metrics.get('cpu_usage', 0.5))
+        memory_efficiency = 1.0 - min(1.0, metrics.get('memory_usage', 0.5))
+        network_efficiency = response.bandwidth_utilization / max(0.01, metrics.get('network_overhead', 1.0))
+        
+        # Packets per resource unit (higher is better)
+        pps_per_cpu = metrics.get('pps', 0) / max(1.0, metrics.get('cpu_usage', 1.0) * 100)
+        resource_ratio = min(1.0, pps_per_cpu / 1000)  # Normalize to reasonable range
+        
+        return (cpu_efficiency * 0.3 + memory_efficiency * 0.2 + 
+                network_efficiency * 0.3 + resource_ratio * 0.2)
+    
+    def _calculate_stealth_objective(self,
+                                   response: TargetResponse,
+                                   metrics: Dict[str, float]) -> float:
+        """Calculate stealth/evasion objective"""
+        # Lower error rates indicate better stealth
+        error_penalty = response.error_rate
+        
+        # Consistent timing reduces detection
+        timing_consistency = 1.0 - metrics.get('timing_variance', 0.5)
+        
+        # Pattern randomization score
+        pattern_randomness = metrics.get('pattern_entropy', 0.5)
+        
+        # Detection avoidance score (based on response patterns)
+        detection_avoidance = self._calculate_detection_avoidance(response, metrics)
+        
+        return ((1.0 - error_penalty) * 0.3 + timing_consistency * 0.25 + 
+                pattern_randomness * 0.25 + detection_avoidance * 0.2)
+    
+    def _calculate_sustainability_objective(self,
+                                          response: TargetResponse,
+                                          metrics: Dict[str, float]) -> float:
+        """Calculate attack sustainability objective"""
+        # Connection stability over time
+        connection_stability = response.connection_success
+        
+        # Rate consistency (ability to maintain target rate)
+        rate_consistency = 1.0 - metrics.get('rate_variance', 0.3)
+        
+        # Long-term effectiveness (doesn't degrade over time)
+        effectiveness_stability = metrics.get('effectiveness_trend', 0.5)
+        
+        # Resource sustainability (not exhausting system resources)
+        resource_sustainability = 1.0 - metrics.get('resource_exhaustion_risk', 0.2)
+        
+        return (connection_stability * 0.3 + rate_consistency * 0.3 + 
+                effectiveness_stability * 0.2 + resource_sustainability * 0.2)
+    
+    def _calculate_detection_avoidance(self,
+                                     response: TargetResponse,
+                                     metrics: Dict[str, float]) -> float:
+        """Calculate detection avoidance score based on response patterns"""
+        # Analyze response time patterns for signs of rate limiting
+        response_time_score = 1.0
+        if response.response_time > 5.0:  # Unusually high response time
+            response_time_score = 0.3
+        elif response.response_time > 2.0:
+            response_time_score = 0.7
+        
+        # Check for signs of connection throttling
+        connection_score = response.connection_success
+        if connection_score < 0.5:  # Many connections failing
+            connection_score *= 0.5  # Penalty for potential detection
+        
+        # Pattern detection avoidance
+        pattern_score = metrics.get('pattern_diversity', 0.8)
+        
+        return (response_time_score * 0.4 + connection_score * 0.4 + pattern_score * 0.2)
+    
+    def _get_adaptive_weights(self,
+                            response: TargetResponse,
+                            metrics: Dict[str, float]) -> Dict[str, float]:
+        """Get adaptive weights based on current attack context"""
+        # Default balanced weights
         weights = {
-            'success_rate': 0.3,
-            'response_time': 0.2,
-            'bandwidth_utilization': 0.2,
-            'packet_rate': 0.15,
-            'error_rate': -0.15  # Negative weight for errors
+            'effectiveness': 0.4,
+            'efficiency': 0.2,
+            'stealth': 0.2,
+            'sustainability': 0.2
         }
         
-        effectiveness = 0.0
-        effectiveness += weights['success_rate'] * response.success_rate
-        effectiveness += weights['response_time'] * (1.0 / (response.response_time + 1e-6))
-        effectiveness += weights['bandwidth_utilization'] * response.bandwidth_utilization
-        effectiveness += weights['packet_rate'] * min(1.0, metrics.get('pps', 0) / 10000)
-        effectiveness += weights['error_rate'] * response.error_rate
+        # Adapt weights based on current performance
+        if response.error_rate > 0.3:  # High error rate - prioritize stealth
+            weights['stealth'] = 0.35
+            weights['effectiveness'] = 0.3
+            weights['efficiency'] = 0.175
+            weights['sustainability'] = 0.175
+        elif metrics.get('cpu_usage', 0.5) > 0.8:  # High resource usage - prioritize efficiency
+            weights['efficiency'] = 0.35
+            weights['effectiveness'] = 0.3
+            weights['stealth'] = 0.175
+            weights['sustainability'] = 0.175
+        elif response.success_rate < 0.3:  # Low success rate - prioritize effectiveness
+            weights['effectiveness'] = 0.5
+            weights['efficiency'] = 0.15
+            weights['stealth'] = 0.2
+            weights['sustainability'] = 0.15
+        elif len(self.response_history) > 10:  # Long-running attack - prioritize sustainability
+            recent_trend = self._calculate_trend([r.success_rate for r in list(self.response_history)[-5:]])
+            if recent_trend == "declining":
+                weights['sustainability'] = 0.35
+                weights['effectiveness'] = 0.3
+                weights['efficiency'] = 0.175
+                weights['stealth'] = 0.175
         
-        return max(0.0, min(1.0, effectiveness))
+        return weights
     
     async def _quantum_optimization(self, 
                                   current_params: OptimizationParameters,
@@ -284,22 +554,86 @@ class ParameterOptimizer:
         }
         
         async def fitness_function(params: OptimizationParameters) -> float:
-            # Simulate fitness based on parameter combination
-            # In real implementation, this would test the parameters
-            base_fitness = effectiveness
+            # Multi-objective fitness evaluation for parameter combination
+            # Simulate metrics based on parameters
+            simulated_metrics = self._simulate_metrics_from_params(params)
+            simulated_response = self._simulate_response_from_params(params)
             
-            # Reward balanced parameters
-            if 1000 <= params.packet_rate <= 50000:
-                base_fitness += 0.1
-            if 500 <= params.packet_size <= 1400:
-                base_fitness += 0.1
-            if 50 <= params.concurrency <= 500:
-                base_fitness += 0.1
-                
-            return base_fitness + random.uniform(-0.05, 0.05)  # Add noise
+            # Use multi-objective fitness calculation
+            fitness = self._calculate_multi_objective_fitness(simulated_response, simulated_metrics)
+            
+            # Add small amount of noise to prevent premature convergence
+            return fitness + random.uniform(-0.02, 0.02)
         
         result = await self.quantum_engine.optimize(fitness_function, bounds)
         return result.parameters
+    
+    def _simulate_metrics_from_params(self, params: OptimizationParameters) -> Dict[str, float]:
+        """Simulate performance metrics based on parameters for fitness evaluation"""
+        # Simulate CPU usage based on packet rate and concurrency
+        cpu_usage = min(1.0, (params.packet_rate * params.concurrency) / 1000000)
+        
+        # Simulate memory usage based on concurrency and packet size
+        memory_usage = min(1.0, (params.concurrency * params.packet_size) / 10000000)
+        
+        # Simulate network overhead based on packet size efficiency
+        optimal_size = 1460  # MTU-optimal
+        size_efficiency = 1.0 - abs(params.packet_size - optimal_size) / optimal_size
+        network_overhead = 1.0 - size_efficiency
+        
+        # Simulate timing variance based on burst interval
+        timing_variance = min(0.5, params.burst_interval * 100)
+        
+        # Simulate rate variance based on system load
+        rate_variance = cpu_usage * 0.3
+        
+        # Simulate pattern entropy (higher concurrency = more randomness)
+        pattern_entropy = min(1.0, params.concurrency / 500)
+        
+        return {
+            'pps': params.packet_rate,
+            'cpu_usage': cpu_usage,
+            'memory_usage': memory_usage,
+            'network_overhead': network_overhead,
+            'timing_variance': timing_variance,
+            'rate_variance': rate_variance,
+            'pattern_entropy': pattern_entropy,
+            'pattern_diversity': pattern_entropy,
+            'effectiveness_trend': 0.7,  # Assume stable
+            'resource_exhaustion_risk': max(cpu_usage, memory_usage) * 0.5
+        }
+    
+    def _simulate_response_from_params(self, params: OptimizationParameters) -> TargetResponse:
+        """Simulate target response based on parameters for fitness evaluation"""
+        # Simulate success rate based on parameter balance
+        rate_factor = 1.0 if params.packet_rate <= 10000 else 0.8
+        size_factor = 1.0 if 500 <= params.packet_size <= 1400 else 0.9
+        concurrency_factor = 1.0 if params.concurrency <= 200 else 0.85
+        
+        success_rate = rate_factor * size_factor * concurrency_factor
+        success_rate = max(0.1, min(1.0, success_rate + random.uniform(-0.1, 0.1)))
+        
+        # Simulate response time based on load
+        base_response_time = 0.1
+        load_factor = (params.packet_rate * params.concurrency) / 100000
+        response_time = base_response_time * (1 + load_factor)
+        
+        # Simulate bandwidth utilization
+        bandwidth_utilization = min(1.0, (params.packet_rate * params.packet_size) / 10000000)
+        
+        # Simulate error rate (inversely related to success rate)
+        error_rate = max(0.0, 1.0 - success_rate - 0.3)
+        
+        # Simulate connection success
+        connection_success = success_rate * 0.9 + 0.1
+        
+        return TargetResponse(
+            response_time=response_time,
+            success_rate=success_rate,
+            error_rate=error_rate,
+            bandwidth_utilization=bandwidth_utilization,
+            connection_success=connection_success
+        )
     
     def _gradient_optimization(self, 
                              current_params: OptimizationParameters,

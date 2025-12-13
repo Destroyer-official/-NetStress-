@@ -6,7 +6,7 @@ Implements atomic operations and lock-free algorithms for maximum performance.
 import threading
 import time
 import ctypes
-from typing import Optional, Any, Generic, TypeVar, List
+from typing import Optional, Any, Generic, TypeVar, List, Dict
 from dataclasses import dataclass
 from enum import Enum
 import weakref
@@ -552,3 +552,293 @@ class LockFreeStatistics:
         self.min_value.set(float('inf'))
         self.max_value.set(float('-inf'))
         self.sum_of_squares.reset()
+
+
+
+class LockFreeBatchQueue(Generic[T]):
+    """
+    Lock-free batch queue optimized for high-throughput producer-consumer scenarios.
+    
+    Features:
+    - Batch enqueue/dequeue for reduced atomic operations
+    - Cache-line padding to avoid false sharing
+    - Optimized for single-producer single-consumer (SPSC) pattern
+    """
+    
+    def __init__(self, capacity: int = 65536):
+        # Ensure capacity is power of 2
+        self.capacity = 1 << (capacity - 1).bit_length()
+        self.mask = self.capacity - 1
+        self._buffer = [None] * self.capacity
+        self._head = LockFreeCounter(0)
+        self._tail = LockFreeCounter(0)
+        self._batch_buffer: List[T] = []
+        self._batch_size = 64
+    
+    def enqueue_batch(self, items: List[T]) -> int:
+        """Enqueue multiple items at once, returns number enqueued"""
+        enqueued = 0
+        tail = self._tail.value
+        head = self._head.value
+        
+        available = self.capacity - (tail - head)
+        to_enqueue = min(len(items), available)
+        
+        for i in range(to_enqueue):
+            idx = (tail + i) & self.mask
+            self._buffer[idx] = items[i]
+        
+        if to_enqueue > 0:
+            self._tail.add(to_enqueue)
+            enqueued = to_enqueue
+        
+        return enqueued
+    
+    def dequeue_batch(self, max_items: int = 64) -> List[T]:
+        """Dequeue multiple items at once"""
+        result = []
+        head = self._head.value
+        tail = self._tail.value
+        
+        available = tail - head
+        to_dequeue = min(max_items, available)
+        
+        for i in range(to_dequeue):
+            idx = (head + i) & self.mask
+            item = self._buffer[idx]
+            if item is not None:
+                result.append(item)
+                self._buffer[idx] = None
+        
+        if result:
+            self._head.add(len(result))
+        
+        return result
+    
+    def size(self) -> int:
+        """Get approximate size"""
+        return self._tail.value - self._head.value
+
+
+class LockFreeStatsAggregator:
+    """
+    Lock-free statistics aggregator for high-performance metrics collection.
+    
+    Optimized for:
+    - High-frequency updates from multiple threads
+    - Low-latency reads
+    - Minimal contention
+    """
+    
+    def __init__(self):
+        self._packets_sent = LockFreeCounter(0)
+        self._bytes_sent = LockFreeCounter(0)
+        self._errors = LockFreeCounter(0)
+        self._latency_sum = LockFreeCounter(0)
+        self._latency_count = LockFreeCounter(0)
+        self._start_time = time.time()
+        
+        # Per-thread local buffers for batching
+        self._local_buffers: Dict[int, Dict[str, int]] = {}
+        self._buffer_lock = threading.Lock()
+        self._flush_threshold = 100
+    
+    def _get_thread_buffer(self) -> Dict[str, int]:
+        """Get or create thread-local buffer"""
+        tid = threading.get_ident()
+        if tid not in self._local_buffers:
+            with self._buffer_lock:
+                if tid not in self._local_buffers:
+                    self._local_buffers[tid] = {
+                        'packets': 0, 'bytes': 0, 'errors': 0,
+                        'latency_sum': 0, 'latency_count': 0
+                    }
+        return self._local_buffers[tid]
+    
+    def record_packet(self, bytes_sent: int, latency_us: int = 0):
+        """Record a sent packet with optional latency"""
+        buf = self._get_thread_buffer()
+        buf['packets'] += 1
+        buf['bytes'] += bytes_sent
+        if latency_us > 0:
+            buf['latency_sum'] += latency_us
+            buf['latency_count'] += 1
+        
+        # Flush if threshold reached
+        if buf['packets'] >= self._flush_threshold:
+            self._flush_buffer(buf)
+    
+    def record_error(self):
+        """Record an error"""
+        buf = self._get_thread_buffer()
+        buf['errors'] += 1
+    
+    def _flush_buffer(self, buf: Dict[str, int]):
+        """Flush thread-local buffer to global counters"""
+        if buf['packets'] > 0:
+            self._packets_sent.add(buf['packets'])
+            self._bytes_sent.add(buf['bytes'])
+            buf['packets'] = 0
+            buf['bytes'] = 0
+        
+        if buf['errors'] > 0:
+            self._errors.add(buf['errors'])
+            buf['errors'] = 0
+        
+        if buf['latency_count'] > 0:
+            self._latency_sum.add(buf['latency_sum'])
+            self._latency_count.add(buf['latency_count'])
+            buf['latency_sum'] = 0
+            buf['latency_count'] = 0
+    
+    def flush_all(self):
+        """Flush all thread-local buffers"""
+        for buf in self._local_buffers.values():
+            self._flush_buffer(buf)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get current statistics"""
+        self.flush_all()
+        
+        elapsed = time.time() - self._start_time
+        packets = self._packets_sent.value
+        bytes_sent = self._bytes_sent.value
+        errors = self._errors.value
+        latency_count = self._latency_count.value
+        
+        avg_latency = 0.0
+        if latency_count > 0:
+            avg_latency = self._latency_sum.value / latency_count
+        
+        return {
+            'packets_sent': packets,
+            'bytes_sent': bytes_sent,
+            'errors': errors,
+            'duration': elapsed,
+            'pps': packets / max(0.001, elapsed),
+            'bps': bytes_sent / max(0.001, elapsed),
+            'mbps': (bytes_sent * 8) / max(0.001, elapsed) / 1_000_000,
+            'error_rate': errors / max(1, packets + errors),
+            'avg_latency_us': avg_latency,
+        }
+    
+    def reset(self):
+        """Reset all statistics"""
+        self._packets_sent.reset()
+        self._bytes_sent.reset()
+        self._errors.reset()
+        self._latency_sum.reset()
+        self._latency_count.reset()
+        self._start_time = time.time()
+        
+        for buf in self._local_buffers.values():
+            for key in buf:
+                buf[key] = 0
+
+
+class AdaptiveRateLimiter:
+    """
+    Adaptive rate limiter that adjusts based on system feedback.
+    
+    Features:
+    - Token bucket with adaptive refill rate
+    - Congestion detection and backoff
+    - Burst allowance for traffic shaping
+    """
+    
+    def __init__(self, target_rate: int, burst_size: int = 0):
+        self.target_rate = target_rate
+        self.burst_size = burst_size if burst_size > 0 else target_rate
+        self._tokens = LockFreeCounter(self.burst_size)
+        self._last_refill = time.time()
+        self._lock = threading.Lock()
+        
+        # Adaptive parameters
+        self._error_count = 0
+        self._success_count = 0
+        self._current_rate = target_rate
+        self._min_rate = target_rate // 10
+        self._max_rate = target_rate * 2
+        self._adaptation_interval = 1.0
+        self._last_adaptation = time.time()
+    
+    def try_acquire(self, count: int = 1) -> bool:
+        """Try to acquire tokens without blocking"""
+        self._refill()
+        
+        current = self._tokens.value
+        if current >= count:
+            self._tokens.add(-count)
+            return True
+        return False
+    
+    def acquire(self, count: int = 1) -> float:
+        """Acquire tokens, blocking if necessary. Returns wait time."""
+        start = time.time()
+        
+        while not self.try_acquire(count):
+            # Calculate wait time
+            deficit = count - self._tokens.value
+            wait_time = deficit / max(1, self._current_rate)
+            time.sleep(min(wait_time, 0.001))  # Max 1ms sleep
+        
+        return time.time() - start
+    
+    def _refill(self):
+        """Refill tokens based on elapsed time"""
+        now = time.time()
+        elapsed = now - self._last_refill
+        
+        if elapsed > 0:
+            new_tokens = int(elapsed * self._current_rate)
+            if new_tokens > 0:
+                current = self._tokens.value
+                new_total = min(current + new_tokens, self.burst_size)
+                self._tokens.reset(new_total)
+                self._last_refill = now
+    
+    def record_success(self):
+        """Record successful operation"""
+        self._success_count += 1
+        self._maybe_adapt()
+    
+    def record_error(self):
+        """Record failed operation"""
+        self._error_count += 1
+        self._maybe_adapt()
+    
+    def _maybe_adapt(self):
+        """Adapt rate based on success/error ratio"""
+        now = time.time()
+        if now - self._last_adaptation < self._adaptation_interval:
+            return
+        
+        total = self._success_count + self._error_count
+        if total < 10:
+            return
+        
+        error_rate = self._error_count / total
+        
+        if error_rate > 0.1:
+            # High error rate - reduce rate
+            self._current_rate = max(self._min_rate, int(self._current_rate * 0.8))
+        elif error_rate < 0.01 and self._current_rate < self._max_rate:
+            # Low error rate - increase rate
+            self._current_rate = min(self._max_rate, int(self._current_rate * 1.1))
+        
+        # Reset counters
+        self._success_count = 0
+        self._error_count = 0
+        self._last_adaptation = now
+    
+    @property
+    def current_rate(self) -> int:
+        """Get current effective rate"""
+        return self._current_rate
+    
+    def set_rate(self, rate: int):
+        """Set new target rate"""
+        self.target_rate = rate
+        self._current_rate = rate
+        self._max_rate = rate * 2
+        self._min_rate = rate // 10

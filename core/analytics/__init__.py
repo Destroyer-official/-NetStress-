@@ -14,6 +14,16 @@ from .metrics_collector import (
     collect_attack_metrics
 )
 
+from .native_stats_bridge import (
+    NativeStatsBridge,
+    NativeStatsSnapshot,
+    get_native_stats_bridge,
+    register_native_engine,
+    unregister_native_engine,
+    start_native_stats_collection,
+    stop_native_stats_collection,
+)
+
 from .performance_tracker import MultiDimensionalPerformanceTracker as PerformanceTracker
 from .visualization_engine import AdvancedVisualizationEngine as VisualizationEngine
 from .predictive_analytics import PredictiveAnalyticsSystem as PredictiveAnalytics
@@ -32,5 +42,13 @@ __all__ = [
     'collect_attack_metrics',
     'PerformanceTracker',
     'VisualizationEngine',
-    'PredictiveAnalytics'
+    'PredictiveAnalytics',
+    # Native stats bridge
+    'NativeStatsBridge',
+    'NativeStatsSnapshot',
+    'get_native_stats_bridge',
+    'register_native_engine',
+    'unregister_native_engine',
+    'start_native_stats_collection',
+    'stop_native_stats_collection',
 ]

@@ -78,6 +78,16 @@ from .mutation_engine import (
     EntropyFitness, UniqueFitness, SizeFitness, CompositeFitness,
     MutationOperator, CrossoverOperator, MutationEngine, AdaptiveMutationEngine
 )
+from .protocol_fuzzer import (
+    FuzzStrategy, FuzzConfig, FuzzResult, CrashInfo,
+    ProtocolGrammar, Mutator, ProtocolFuzzer,
+    HTTPFuzzer, DNSFuzzer, TCPFuzzer, create_fuzzer
+)
+from .advanced_vectors import (
+    AttackCategory, AttackWaveConfig, PayloadEngine, EvasionEngine,
+    MultiVectorAttack, AdaptiveAttackController,
+    ATTACK_PROFILES, get_attack_profile
+)
 
 __all__ = [
     # Amplification
@@ -127,4 +137,12 @@ __all__ = [
     'MutationType', 'MutationConfig', 'Individual', 'FitnessFunction',
     'EntropyFitness', 'UniqueFitness', 'SizeFitness', 'CompositeFitness',
     'MutationOperator', 'CrossoverOperator', 'MutationEngine', 'AdaptiveMutationEngine',
+    # Protocol Fuzzer
+    'FuzzStrategy', 'FuzzConfig', 'FuzzResult', 'CrashInfo',
+    'ProtocolGrammar', 'Mutator', 'ProtocolFuzzer',
+    'HTTPFuzzer', 'DNSFuzzer', 'TCPFuzzer', 'create_fuzzer',
+    # Advanced Vectors
+    'AttackCategory', 'AttackWaveConfig', 'PayloadEngine', 'EvasionEngine',
+    'MultiVectorAttack', 'AdaptiveAttackController',
+    'ATTACK_PROFILES', 'get_attack_profile',
 ]

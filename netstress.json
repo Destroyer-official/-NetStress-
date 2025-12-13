@@ -1,0 +1,30 @@
+{
+  "environment": "development",
+  "version": "2.0.0",
+  "safety": {
+    "enable_target_validation": true,
+    "max_rate_pps": 10000000,
+    "max_duration_seconds": 3600,
+    "enable_audit_logging": true,
+    "require_confirmation": false
+  },
+  "performance": {
+    "use_native_engine": true,
+    "use_zero_copy": true,
+    "thread_count": 0,
+    "buffer_size": 65536
+  },
+  "logging": {
+    "level": "DEBUG",
+    "format": "text",
+    "file": "netstress.log",
+    "max_size_mb": 100,
+    "backup_count": 5
+  },
+  "health": {
+    "enable_self_healing": true,
+    "check_interval_seconds": 10,
+    "memory_threshold_percent": 80,
+    "cpu_threshold_percent": 85
+  }
+}

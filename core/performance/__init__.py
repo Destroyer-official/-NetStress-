@@ -30,6 +30,18 @@ except ImportError:
     RealKernelOptimizer = None
     RealZeroCopy = None
 
+# Ultra high-performance engine
+try:
+    from .ultra_engine import (
+        EngineMode, UltraConfig, UltraStats,
+        PacketBuffer, BatchSender, IOUringEngine,
+        UltraEngine, RateLimiter, MultiProtocolEngine,
+        create_ultra_engine
+    )
+except ImportError:
+    UltraEngine = None
+    create_ultra_engine = None
+
 __all__ = [
     # Legacy (may have simulations)
     'KernelOptimizer',
@@ -43,4 +55,15 @@ __all__ = [
     'get_zero_copy',
     'CapabilityReport',
     'ZeroCopyStatus',
+    # Ultra Engine
+    'EngineMode',
+    'UltraConfig',
+    'UltraStats',
+    'PacketBuffer',
+    'BatchSender',
+    'IOUringEngine',
+    'UltraEngine',
+    'RateLimiter',
+    'MultiProtocolEngine',
+    'create_ultra_engine',
 ]

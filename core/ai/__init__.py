@@ -40,6 +40,16 @@ from .ai_orchestrator import (
     ai_orchestrator
 )
 
+from .attack_optimizer import (
+    OptimizationGoal,
+    AttackParameters,
+    AttackResult,
+    GeneticOptimizer,
+    ReinforcementLearner,
+    BayesianOptimizer,
+    AttackOptimizer
+)
+
 __all__ = [
     'MLModelManager',
     'NeuralNetworkArchitecture', 
@@ -59,5 +69,13 @@ __all__ = [
     'RegressionDetector',
     'AIOrchestrator',
     'AIOptimizationResult',
-    'ai_orchestrator'
+    'ai_orchestrator',
+    # Attack Optimizer
+    'OptimizationGoal',
+    'AttackParameters',
+    'AttackResult',
+    'GeneticOptimizer',
+    'ReinforcementLearner',
+    'BayesianOptimizer',
+    'AttackOptimizer'
 ]

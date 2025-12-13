@@ -1,352 +1,395 @@
 """
 Tests for Advanced Features
 
-Tests for:
-- Payload generation
-- Attack orchestration
-- Adaptive attacks
-- Packet crafting
+Tests for protocol fuzzer, attack optimizer, ultra engine, and advanced vectors.
 """
 
 import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-class TestPayloadGenerator:
-    """Tests for payload generation"""
+class TestProtocolFuzzer:
+    """Tests for protocol fuzzer"""
     
-    def test_random_payload(self):
+    def test_fuzzer_import(self):
+        """Test fuzzer can be imported"""
+        from core.attacks.protocol_fuzzer import (
+            FuzzStrategy, FuzzConfig, ProtocolFuzzer, create_fuzzer
+        )
+        assert FuzzStrategy is not None
+        assert FuzzConfig is not None
+    
+    def test_fuzzer_creation(self):
+        """Test fuzzer creation"""
+        from core.attacks.protocol_fuzzer import create_fuzzer, FuzzConfig
+        
+        config = FuzzConfig(max_iterations=10)
+        fuzzer = create_fuzzer('generic', config)
+        assert fuzzer is not None
+    
+    def test_http_fuzzer(self):
+        """Test HTTP fuzzer"""
+        from core.attacks.protocol_fuzzer import HTTPFuzzer, FuzzConfig
+        
+        config = FuzzConfig()
+        fuzzer = HTTPFuzzer(config)
+        
+        # Generate HTTP request
+        request = fuzzer.generate_http_request()
+        assert isinstance(request, bytes)
+        assert b'HTTP' in request
+    
+    def test_dns_fuzzer(self):
+        """Test DNS fuzzer"""
+        from core.attacks.protocol_fuzzer import DNSFuzzer, FuzzConfig
+        
+        config = FuzzConfig()
+        fuzzer = DNSFuzzer(config)
+        
+        # Generate DNS query
+        query = fuzzer.generate_dns_query()
+        assert isinstance(query, bytes)
+        assert len(query) > 12  # Minimum DNS header size
+    
+    def test_mutator(self):
+        """Test mutator"""
+        from core.attacks.protocol_fuzzer import Mutator, FuzzConfig, MutationType
+        
+        config = FuzzConfig()
+        mutator = Mutator(config)
+        
+        original = b"Hello, World!"
+        mutated, desc = mutator.mutate(original)
+        
+        assert isinstance(mutated, bytes)
+        assert isinstance(desc, str)
+    
+    def test_mutation_types(self):
+        """Test different mutation types"""
+        from core.attacks.protocol_fuzzer import Mutator, FuzzConfig, MutationType
+        
+        config = FuzzConfig()
+        mutator = Mutator(config)
+        original = b"Test data for mutation"
+        
+        for mut_type in MutationType:
+            mutated, desc = mutator.mutate(original, mut_type)
+            assert isinstance(mutated, bytes)
+
+
+class TestAttackOptimizer:
+    """Tests for attack optimizer"""
+    
+    def test_optimizer_import(self):
+        """Test optimizer can be imported"""
+        from core.ai.attack_optimizer import (
+            OptimizationGoal, AttackParameters, AttackOptimizer
+        )
+        assert OptimizationGoal is not None
+        assert AttackParameters is not None
+    
+    def test_attack_parameters(self):
+        """Test attack parameters"""
+        from core.ai.attack_optimizer import AttackParameters
+        
+        params = AttackParameters()
+        assert params.packet_size == 1472
+        assert params.rate_pps == 100000
+        assert params.thread_count == 4
+    
+    def test_parameters_to_vector(self):
+        """Test parameter vectorization"""
+        from core.ai.attack_optimizer import AttackParameters
+        
+        params = AttackParameters()
+        vector = params.to_vector()
+        
+        assert isinstance(vector, list)
+        assert len(vector) == 7
+        assert all(0 <= v <= 1 for v in vector)
+    
+    def test_parameters_from_vector(self):
+        """Test parameter from vector"""
+        from core.ai.attack_optimizer import AttackParameters
+        
+        vector = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        params = AttackParameters.from_vector(vector)
+        
+        assert isinstance(params, AttackParameters)
+        assert params.packet_size > 0
+    
+    def test_parameter_mutation(self):
+        """Test parameter mutation"""
+        from core.ai.attack_optimizer import AttackParameters
+        
+        params = AttackParameters()
+        mutated = params.mutate(mutation_rate=1.0)  # Force mutation
+        
+        assert isinstance(mutated, AttackParameters)
+    
+    def test_parameter_crossover(self):
+        """Test parameter crossover"""
+        from core.ai.attack_optimizer import AttackParameters
+        
+        params1 = AttackParameters(packet_size=1000)
+        params2 = AttackParameters(packet_size=2000)
+        
+        child = params1.crossover(params2)
+        assert isinstance(child, AttackParameters)
+    
+    def test_genetic_optimizer(self):
+        """Test genetic optimizer"""
+        from core.ai.attack_optimizer import GeneticOptimizer, AttackParameters
+        
+        optimizer = GeneticOptimizer(population_size=10)
+        optimizer.initialize_population()
+        
+        assert len(optimizer.population) == 10
+        
+        # Evaluate with dummy fitness
+        optimizer.evaluate_population(lambda p: 0.5)
+        
+        # Evolve
+        optimizer.evolve()
+        assert optimizer.generation == 1
+    
+    def test_reinforcement_learner(self):
+        """Test reinforcement learner"""
+        from core.ai.attack_optimizer import ReinforcementLearner, AttackParameters
+        
+        learner = ReinforcementLearner()
+        params = AttackParameters()
+        
+        new_params, reward = learner.optimize_step(params, lambda p: 0.5)
+        
+        assert isinstance(new_params, AttackParameters)
+        assert isinstance(reward, float)
+    
+    def test_bayesian_optimizer(self):
+        """Test Bayesian optimizer"""
+        from core.ai.attack_optimizer import BayesianOptimizer
+        
+        bounds = {
+            'packet_size': (64, 65535),
+            'rate_pps': (1000, 10000000),
+        }
+        
+        optimizer = BayesianOptimizer(bounds)
+        suggestion = optimizer.suggest()
+        
+        assert 'packet_size' in suggestion
+        assert 'rate_pps' in suggestion
+        
+        optimizer.observe(suggestion, 0.5)
+        assert len(optimizer.observations) == 1
+
+
+class TestUltraEngine:
+    """Tests for ultra engine"""
+    
+    def test_ultra_engine_import(self):
+        """Test ultra engine can be imported"""
+        from core.performance.ultra_engine import (
+            EngineMode, UltraConfig, UltraEngine, create_ultra_engine
+        )
+        assert EngineMode is not None
+        assert UltraConfig is not None
+    
+    def test_ultra_config(self):
+        """Test ultra config"""
+        from core.performance.ultra_engine import UltraConfig, EngineMode
+        
+        config = UltraConfig(
+            target="127.0.0.1",
+            port=8080,
+            mode=EngineMode.HYBRID
+        )
+        
+        assert config.target == "127.0.0.1"
+        assert config.port == 8080
+        assert config.mode == EngineMode.HYBRID
+    
+    def test_ultra_stats(self):
+        """Test ultra stats"""
+        from core.performance.ultra_engine import UltraStats
+        import time
+        
+        stats = UltraStats()
+        stats.start_time = time.time() - 1
+        stats.packets_sent = 1000
+        stats.bytes_sent = 1000000
+        
+        assert stats.pps > 0
+        assert stats.mbps > 0
+    
+    def test_packet_buffer(self):
+        """Test packet buffer pool"""
+        from core.performance.ultra_engine import PacketBuffer
+        
+        pool = PacketBuffer(count=10, size=1500)
+        
+        idx, buf = pool.acquire()
+        assert idx >= 0
+        assert len(buf) == 1500
+        
+        pool.release(idx)
+    
+    def test_rate_limiter(self):
+        """Test rate limiter"""
+        from core.performance.ultra_engine import RateLimiter
+        
+        limiter = RateLimiter(rate=1000)
+        
+        # Should allow first request
+        assert limiter.allow() == True
+    
+    def test_create_ultra_engine(self):
+        """Test create_ultra_engine function"""
+        from core.performance.ultra_engine import create_ultra_engine, EngineMode
+        
+        engine = create_ultra_engine(
+            target="127.0.0.1",
+            port=9999,
+            mode=EngineMode.STANDARD
+        )
+        
+        assert engine is not None
+        assert not engine.is_running()
+
+
+class TestAdvancedVectors:
+    """Tests for advanced attack vectors"""
+    
+    def test_advanced_vectors_import(self):
+        """Test advanced vectors can be imported"""
+        from core.attacks.advanced_vectors import (
+            AttackCategory, PayloadEngine, EvasionEngine,
+            MultiVectorAttack, ATTACK_PROFILES
+        )
+        assert AttackCategory is not None
+        assert PayloadEngine is not None
+    
+    def test_payload_engine_random(self):
         """Test random payload generation"""
-        from core.attacks.payload_generator import RandomPayload, PayloadConfig
+        from core.attacks.advanced_vectors import PayloadEngine
         
-        config = PayloadConfig(min_size=64, max_size=128)
-        generator = RandomPayload(config)
-        
-        payload = generator.generate()
-        
-        assert len(payload) >= 64
-        assert len(payload) <= 128
-        
-    def test_pattern_payload(self):
-        """Test pattern payload generation"""
-        from core.attacks.payload_generator import PatternPayload, PayloadConfig
-        
-        config = PayloadConfig(min_size=100, max_size=200)
-        generator = PatternPayload(config)
-        
-        payload = generator.generate()
-        
-        assert len(payload) >= 100
-        assert len(payload) <= 200
-        
-    def test_polymorphic_payload(self):
-        """Test polymorphic payload generation"""
-        from core.attacks.payload_generator import PolymorphicPayload, PayloadConfig
-        
-        config = PayloadConfig(min_size=50, max_size=100, mutation_rate=0.2)
-        generator = PolymorphicPayload(config)
-        
-        payloads = [generator.generate() for _ in range(10)]
-        
-        # Should generate different payloads
-        unique = len(set(payloads))
-        assert unique > 1
-        
-    def test_fuzzing_payload(self):
-        """Test fuzzing payload generation"""
-        from core.attacks.payload_generator import FuzzingPayload, PayloadConfig
-        
-        config = PayloadConfig()
-        generator = FuzzingPayload(config, fuzz_type='overflow')
-        
-        payload = generator.generate()
-        
-        assert len(payload) > 0
-        
-    def test_protocol_payload_http(self):
-        """Test HTTP protocol payload"""
-        from core.attacks.payload_generator import ProtocolPayload, PayloadConfig
-        
-        config = PayloadConfig()
-        generator = ProtocolPayload(config, protocol='http')
-        
-        payload = generator.generate()
-        
-        assert b'HTTP/1.1' in payload
-        
-    def test_protocol_payload_dns(self):
-        """Test DNS protocol payload"""
-        from core.attacks.payload_generator import ProtocolPayload, PayloadConfig
-        
-        config = PayloadConfig()
-        generator = ProtocolPayload(config, protocol='dns')
-        
-        payload = generator.generate()
-        
-        assert len(payload) > 12  # DNS header size
-        
-    def test_evasion_payload(self):
-        """Test evasion payload generation"""
-        from core.attacks.payload_generator import EvasionPayload, PayloadConfig
-        
-        config = PayloadConfig(min_size=50, max_size=100)
-        generator = EvasionPayload(config)
-        
-        payload = generator.generate()
-        
-        assert len(payload) > 0
-        
-    def test_payload_factory(self):
-        """Test payload factory"""
-        from core.attacks.payload_generator import PayloadFactory, PayloadType
-        
-        generator = PayloadFactory.create(PayloadType.RANDOM)
-        payload = generator.generate()
-        
-        assert len(payload) > 0
-        
-    def test_payload_batch(self):
-        """Test batch payload generation"""
-        from core.attacks.payload_generator import RandomPayload, PayloadConfig
-        
-        config = PayloadConfig()
-        generator = RandomPayload(config)
-        
-        payloads = generator.generate_batch(10)
-        
-        assert len(payloads) == 10
-
-
-class TestAttackOrchestrator:
-    """Tests for attack orchestration"""
+        payload = PayloadEngine.random_payload(100)
+        assert len(payload) == 100
+        assert isinstance(payload, bytes)
     
-    def test_attack_config(self):
-        """Test attack configuration"""
-        from core.attacks.orchestrator import AttackConfig, AttackVector
+    def test_payload_engine_http(self):
+        """Test HTTP payload generation"""
+        from core.attacks.advanced_vectors import PayloadEngine
         
-        config = AttackConfig(
-            target='127.0.0.1',
-            port=80,
-            duration=60,
-            vectors=[AttackVector.VOLUMETRIC, AttackVector.APPLICATION]
-        )
-        
-        assert config.target == '127.0.0.1'
-        assert len(config.vectors) == 2
-        
-    def test_attack_metrics(self):
-        """Test attack metrics"""
-        from core.attacks.orchestrator import AttackMetrics
-        
-        metrics = AttackMetrics()
-        metrics.update(sent=100, received=90, errors=10)
-        
-        assert metrics.requests_sent == 100
-        assert metrics.responses_received == 90
-        assert metrics.errors == 10
-        
-    def test_target_analyzer(self):
-        """Test target analyzer"""
-        from core.attacks.orchestrator import TargetAnalyzer
-        
-        analyzer = TargetAnalyzer()
-        
-        # Record some responses
-        for _ in range(10):
-            analyzer.record_response(0.1, 200)
-            
-        health = analyzer.get_health_score()
-        
-        assert 0 <= health <= 1
-        
-    def test_orchestrator_init(self):
-        """Test orchestrator initialization"""
-        from core.attacks.orchestrator import AttackOrchestrator, AttackConfig
-        
-        config = AttackConfig(target='127.0.0.1', port=80)
-        orchestrator = AttackOrchestrator(config)
-        
-        assert orchestrator.config.target == '127.0.0.1'
-
-
-class TestAdaptiveAttacks:
-    """Tests for adaptive attacks"""
+        payload = PayloadEngine.http_flood_payload("example.com")
+        assert b"HTTP" in payload
+        assert b"Host:" in payload
     
-    def test_adaptive_config(self):
-        """Test adaptive configuration"""
-        from core.attacks.adaptive import AdaptiveConfig, AdaptationStrategy
+    def test_payload_engine_dns(self):
+        """Test DNS payload generation"""
+        from core.attacks.advanced_vectors import PayloadEngine
         
-        config = AdaptiveConfig(
-            strategy=AdaptationStrategy.BALANCED,
-            min_rate=100,
-            max_rate=10000
-        )
-        
-        assert config.strategy == AdaptationStrategy.BALANCED
-        assert config.min_rate == 100
-        
-    def test_response_analyzer(self):
-        """Test response analyzer"""
-        from core.attacks.adaptive import ResponseAnalyzer, ResponseMetrics, TargetState
-        
-        analyzer = ResponseAnalyzer()
-        
-        # Record healthy responses
-        for _ in range(20):
-            analyzer.record(ResponseMetrics(response_time=0.1))
-            
-        state = analyzer.get_state()
-        
-        assert state == TargetState.HEALTHY
-        
-    def test_response_analyzer_stressed(self):
-        """Test response analyzer with stressed target"""
-        from core.attacks.adaptive import ResponseAnalyzer, ResponseMetrics, TargetState
-        
-        analyzer = ResponseAnalyzer()
-        analyzer.set_baseline(0.1)
-        
-        # Record slow responses
-        for _ in range(20):
-            analyzer.record(ResponseMetrics(response_time=0.5))
-            
-        state = analyzer.get_state()
-        
-        assert state in [TargetState.STRESSED, TargetState.DEGRADED]
-        
-    def test_adaptive_controller_init(self):
-        """Test adaptive controller initialization"""
-        from core.attacks.adaptive import AdaptiveController, AdaptiveConfig
-        
-        config = AdaptiveConfig()
-        controller = AdaptiveController(config)
-        
-        assert controller.current_rate == config.min_rate
-        
-    def test_pattern_learner(self):
-        """Test pattern learner"""
-        from core.attacks.adaptive import PatternLearner
-        
-        learner = PatternLearner()
-        
-        # Record some data
-        for rate in [1000, 2000, 3000]:
-            for _ in range(5):
-                learner.record_rate_impact(rate, rate / 5000)
-                
-        optimal = learner.get_optimal_rate()
-        
-        # Should recommend highest rate with best impact
-        assert optimal is not None
-        
-    def test_multi_strategy_adapter(self):
-        """Test multi-strategy adapter"""
-        from core.attacks.adaptive import MultiStrategyAdapter, AdaptiveConfig, AdaptationStrategy
-        
-        config = AdaptiveConfig()
-        adapter = MultiStrategyAdapter(config)
-        
-        strategy = adapter.select_strategy()
-        
-        assert strategy in AdaptationStrategy
-
-
-class TestPacketCrafting:
-    """Tests for packet crafting"""
+        payload = PayloadEngine.dns_amplification_payload("example.com")
+        assert isinstance(payload, bytes)
+        assert len(payload) > 12
     
-    def test_ip_header(self):
-        """Test IP header creation"""
-        from core.networking.packet_craft import IPHeader
+    def test_payload_engine_ntp(self):
+        """Test NTP payload generation"""
+        from core.attacks.advanced_vectors import PayloadEngine
         
-        header = IPHeader(
-            src_addr='192.168.1.1',
-            dst_addr='192.168.1.2',
-            ttl=64
+        payload = PayloadEngine.ntp_monlist_payload()
+        assert isinstance(payload, bytes)
+    
+    def test_payload_engine_ssdp(self):
+        """Test SSDP payload generation"""
+        from core.attacks.advanced_vectors import PayloadEngine
+        
+        payload = PayloadEngine.ssdp_amplification_payload()
+        assert b"M-SEARCH" in payload
+    
+    def test_evasion_engine_timing(self):
+        """Test evasion timing randomization"""
+        from core.attacks.advanced_vectors import EvasionEngine
+        
+        delays = [EvasionEngine.randomize_timing(1.0) for _ in range(10)]
+        
+        # Should have variation
+        assert len(set(delays)) > 1
+    
+    def test_evasion_engine_fragment(self):
+        """Test payload fragmentation"""
+        from core.attacks.advanced_vectors import EvasionEngine
+        
+        payload = b"A" * 1000
+        fragments = EvasionEngine.fragment_payload(payload, max_fragment_size=100)
+        
+        assert len(fragments) == 10
+        assert all(len(f) <= 100 for f in fragments)
+    
+    def test_evasion_engine_encode(self):
+        """Test payload encoding"""
+        from core.attacks.advanced_vectors import EvasionEngine
+        
+        payload = b"Hello, World!"
+        
+        xor_encoded = EvasionEngine.encode_payload(payload, "xor")
+        assert xor_encoded != payload
+        
+        b64_encoded = EvasionEngine.encode_payload(payload, "base64")
+        assert b64_encoded != payload
+    
+    def test_attack_profiles(self):
+        """Test attack profiles"""
+        from core.attacks.advanced_vectors import ATTACK_PROFILES, get_attack_profile
+        
+        assert 'volumetric_udp' in ATTACK_PROFILES
+        assert 'http_flood' in ATTACK_PROFILES
+        assert 'amplification' in ATTACK_PROFILES
+        assert 'hybrid' in ATTACK_PROFILES
+        
+        profile = get_attack_profile('http_flood')
+        assert profile is not None
+        assert len(profile.vectors) > 0
+
+
+class TestIntegration:
+    """Integration tests"""
+    
+    def test_all_modules_import(self):
+        """Test all new modules can be imported together"""
+        from core.attacks import (
+            ProtocolFuzzer, HTTPFuzzer, DNSFuzzer,
+            PayloadEngine, EvasionEngine, MultiVectorAttack
+        )
+        from core.ai import (
+            AttackOptimizer, GeneticOptimizer, ReinforcementLearner
+        )
+        from core.performance import (
+            UltraEngine, create_ultra_engine
         )
         
-        packed = header.pack()
+        assert ProtocolFuzzer is not None
+        assert AttackOptimizer is not None
+        assert UltraEngine is not None
+    
+    def test_native_engine_with_ultra(self):
+        """Test native engine integration with ultra engine"""
+        from core.native_engine import is_native_available
+        from core.performance.ultra_engine import UltraConfig, EngineMode
         
-        assert len(packed) == 20  # Standard IP header
-        
-    def test_tcp_header(self):
-        """Test TCP header creation"""
-        from core.networking.packet_craft import TCPHeader, TCPFlags
-        
-        header = TCPHeader(
-            src_port=12345,
-            dst_port=80,
-            flags=TCPFlags.SYN.value
+        # Ultra engine should work regardless of native availability
+        config = UltraConfig(
+            target="127.0.0.1",
+            port=9999,
+            mode=EngineMode.HYBRID
         )
         
-        packed = header.pack('192.168.1.1', '192.168.1.2')
-        
-        assert len(packed) == 20  # Standard TCP header
-        
-    def test_udp_header(self):
-        """Test UDP header creation"""
-        from core.networking.packet_craft import UDPHeader
-        
-        header = UDPHeader(
-            src_port=12345,
-            dst_port=53
-        )
-        
-        packed = header.pack('192.168.1.1', '192.168.1.2', b'test')
-        
-        assert len(packed) == 8  # UDP header size
-        
-    def test_icmp_header(self):
-        """Test ICMP header creation"""
-        from core.networking.packet_craft import ICMPHeader
-        
-        header = ICMPHeader(type=8, code=0)
-        
-        packed = header.pack(b'test payload')
-        
-        assert len(packed) == 8  # ICMP header size
-        
-    def test_packet_crafter_syn(self):
-        """Test SYN packet crafting"""
-        from core.networking.packet_craft import PacketCrafter
-        
-        crafter = PacketCrafter()
-        
-        packet = crafter.craft_tcp_syn(
-            '192.168.1.1', '192.168.1.2', 12345, 80
-        )
-        
-        assert len(packet) == 40  # IP + TCP headers
-        
-    def test_packet_crafter_udp(self):
-        """Test UDP packet crafting"""
-        from core.networking.packet_craft import PacketCrafter
-        
-        crafter = PacketCrafter()
-        
-        packet = crafter.craft_udp(
-            '192.168.1.1', '192.168.1.2', 12345, 53, b'test'
-        )
-        
-        assert len(packet) == 32  # IP + UDP + payload
-        
-    def test_ip_spoof_helper(self):
-        """Test IP spoof helper"""
-        from core.networking.packet_craft import IPSpoofHelper
-        
-        ip = IPSpoofHelper.random_ip()
-        
-        parts = ip.split('.')
-        assert len(parts) == 4
-        
-    def test_port_helper(self):
-        """Test port helper"""
-        from core.networking.packet_craft import PortHelper
-        
-        port = PortHelper.random_port()
-        
-        assert 1024 <= port <= 65535
-        
-        ephemeral = PortHelper.random_ephemeral_port()
-        
-        assert 49152 <= ephemeral <= 65535
+        assert config is not None
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

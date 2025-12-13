@@ -146,9 +146,40 @@ validation_reports/
 
 # Unnecessary/archived files
 unnecessary/
+old_*/
+temp_*/
+*_backup/
+*.backup
+
+# Generated reports
+*_report*.txt
+*_report*.json
+*_results*.txt
+*_results*.json
 
 # Compliance reports (generated)
 compliance_reports/
+
+# Benchmark reports (generated)
+benchmark_reports/
+
+# Regression reports (generated)
+regression_reports/
+
+# Validation reports (generated)
+validation_reports/
+
+# Native engine build artifacts
+native/rust_engine/target/
+native/c_driver/*.o
+native/c_driver/*.so
+native/c_driver/*.dll
+*.whl
+
+# Rust build files
+Cargo.lock
+*.rlib
+*.rmeta
 
 # OS files
 Thumbs.db

@@ -457,3 +457,395 @@ class SafetyManager:
         self.safety_enabled = True
         self.emergency_shutdown_triggered = False
         logger.info("Safety controls re-enabled")
+
+
+class IntelligentRateLimiter:
+    """Intelligent rate limiting with adaptive thresholds"""
+    
+    def __init__(self, base_rate: int = 100000):
+        self.base_rate = base_rate
+        self.current_rate = base_rate
+        self.rate_history = []
+        self.adjustment_factor = 1.0
+        self.min_rate = 1000
+        self.max_rate = 10000000
+        
+        # Adaptive parameters
+        self.cpu_threshold = 0.85
+        self.memory_threshold = 0.85
+        self.network_threshold = 0.90
+        
+        # Learning parameters
+        self.learning_rate = 0.1
+        self.performance_history = []
+    
+    def calculate_optimal_rate(self, cpu_usage: float, memory_usage: float, 
+                              network_usage: float, error_rate: float) -> int:
+        """Calculate optimal rate based on system conditions"""
+        # Start with base adjustment
+        adjustment = 1.0
+        
+        # CPU-based adjustment
+        if cpu_usage > self.cpu_threshold:
+            cpu_factor = 1.0 - ((cpu_usage - self.cpu_threshold) / (1.0 - self.cpu_threshold))
+            adjustment *= max(0.5, cpu_factor)
+        elif cpu_usage < self.cpu_threshold * 0.7:
+            # Room to increase
+            adjustment *= 1.1
+        
+        # Memory-based adjustment
+        if memory_usage > self.memory_threshold:
+            mem_factor = 1.0 - ((memory_usage - self.memory_threshold) / (1.0 - self.memory_threshold))
+            adjustment *= max(0.5, mem_factor)
+        
+        # Network-based adjustment
+        if network_usage > self.network_threshold:
+            net_factor = 1.0 - ((network_usage - self.network_threshold) / (1.0 - self.network_threshold))
+            adjustment *= max(0.3, net_factor)
+        
+        # Error rate adjustment
+        if error_rate > 0.1:
+            adjustment *= max(0.5, 1.0 - error_rate)
+        
+        # Apply learning from history
+        if len(self.performance_history) > 10:
+            recent_performance = sum(self.performance_history[-10:]) / 10
+            if recent_performance > 0.8:
+                adjustment *= 1.05  # Slight increase if performing well
+            elif recent_performance < 0.5:
+                adjustment *= 0.9  # Decrease if performing poorly
+        
+        # Calculate new rate
+        new_rate = int(self.current_rate * adjustment)
+        new_rate = max(self.min_rate, min(self.max_rate, new_rate))
+        
+        # Smooth transition
+        self.current_rate = int(
+            self.learning_rate * new_rate + 
+            (1 - self.learning_rate) * self.current_rate
+        )
+        
+        self.rate_history.append({
+            'timestamp': time.time(),
+            'rate': self.current_rate,
+            'adjustment': adjustment
+        })
+        
+        return self.current_rate
+    
+    def record_performance(self, success_rate: float):
+        """Record performance for learning"""
+        self.performance_history.append(success_rate)
+        if len(self.performance_history) > 100:
+            self.performance_history = self.performance_history[-100:]
+    
+    def get_rate_recommendation(self) -> Dict:
+        """Get rate recommendation with explanation"""
+        return {
+            'recommended_rate': self.current_rate,
+            'base_rate': self.base_rate,
+            'adjustment_factor': self.current_rate / self.base_rate,
+            'recent_adjustments': self.rate_history[-10:] if self.rate_history else []
+        }
+
+
+class AttackProfiler:
+    """Profile attack patterns for safety analysis"""
+    
+    def __init__(self):
+        self.attack_profiles = {}
+        self.pattern_signatures = {}
+        self.risk_scores = {}
+    
+    def profile_attack(self, attack_id: str, config: Dict) -> Dict:
+        """Create profile for an attack configuration"""
+        profile = {
+            'attack_id': attack_id,
+            'timestamp': time.time(),
+            'config': config.copy(),
+            'risk_factors': [],
+            'risk_score': 0.0
+        }
+        
+        # Analyze risk factors
+        risk_score = 0.0
+        
+        # High rate attacks
+        rate = config.get('packet_rate', 0)
+        if rate > 1000000:
+            profile['risk_factors'].append('high_rate')
+            risk_score += 0.3
+        
+        # Large packet sizes
+        size = config.get('packet_size', 0)
+        if size > 10000:
+            profile['risk_factors'].append('large_packets')
+            risk_score += 0.2
+        
+        # Many threads
+        threads = config.get('thread_count', 0)
+        if threads > 32:
+            profile['risk_factors'].append('high_thread_count')
+            risk_score += 0.2
+        
+        # Long duration
+        duration = config.get('duration', 0)
+        if duration > 300:
+            profile['risk_factors'].append('long_duration')
+            risk_score += 0.2
+        
+        # Protocol-specific risks
+        protocol = config.get('protocol', '').lower()
+        if protocol in ['tcp', 'syn']:
+            profile['risk_factors'].append('connection_based')
+            risk_score += 0.1
+        
+        profile['risk_score'] = min(1.0, risk_score)
+        self.attack_profiles[attack_id] = profile
+        self.risk_scores[attack_id] = profile['risk_score']
+        
+        return profile
+    
+    def get_risk_assessment(self, attack_id: str) -> Dict:
+        """Get risk assessment for an attack"""
+        if attack_id not in self.attack_profiles:
+            return {'risk_score': 0.5, 'assessment': 'unknown'}
+        
+        profile = self.attack_profiles[attack_id]
+        risk_score = profile['risk_score']
+        
+        if risk_score < 0.3:
+            assessment = 'low_risk'
+            recommendation = 'Safe to proceed with standard monitoring'
+        elif risk_score < 0.6:
+            assessment = 'medium_risk'
+            recommendation = 'Proceed with enhanced monitoring'
+        elif risk_score < 0.8:
+            assessment = 'high_risk'
+            recommendation = 'Consider reducing attack parameters'
+        else:
+            assessment = 'critical_risk'
+            recommendation = 'Attack parameters may cause system instability'
+        
+        return {
+            'risk_score': risk_score,
+            'assessment': assessment,
+            'risk_factors': profile['risk_factors'],
+            'recommendation': recommendation
+        }
+
+
+class CircuitBreaker:
+    """Circuit breaker pattern for attack safety"""
+    
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 60.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        
+        self.state = 'closed'  # closed, open, half-open
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.success_count = 0
+        
+        self.state_history = []
+    
+    def record_success(self):
+        """Record successful operation"""
+        if self.state == 'half-open':
+            self.success_count += 1
+            if self.success_count >= 3:
+                self._transition_to('closed')
+        
+        self.failure_count = max(0, self.failure_count - 1)
+    
+    def record_failure(self, reason: str = ''):
+        """Record failed operation"""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self._transition_to('open')
+    
+    def can_proceed(self) -> Tuple[bool, str]:
+        """Check if operation can proceed"""
+        if self.state == 'closed':
+            return True, 'Circuit closed - normal operation'
+        
+        if self.state == 'open':
+            # Check if recovery timeout has passed
+            if self.last_failure_time:
+                elapsed = time.time() - self.last_failure_time
+                if elapsed >= self.recovery_timeout:
+                    self._transition_to('half-open')
+                    return True, 'Circuit half-open - testing recovery'
+            
+            return False, f'Circuit open - waiting for recovery ({self.recovery_timeout}s)'
+        
+        if self.state == 'half-open':
+            return True, 'Circuit half-open - limited operation'
+        
+        return False, 'Unknown circuit state'
+    
+    def _transition_to(self, new_state: str):
+        """Transition to new state"""
+        old_state = self.state
+        self.state = new_state
+        
+        if new_state == 'closed':
+            self.failure_count = 0
+            self.success_count = 0
+        elif new_state == 'half-open':
+            self.success_count = 0
+        
+        self.state_history.append({
+            'timestamp': time.time(),
+            'from_state': old_state,
+            'to_state': new_state
+        })
+        
+        logger.info(f"Circuit breaker: {old_state} -> {new_state}")
+    
+    def get_status(self) -> Dict:
+        """Get circuit breaker status"""
+        return {
+            'state': self.state,
+            'failure_count': self.failure_count,
+            'failure_threshold': self.failure_threshold,
+            'last_failure_time': self.last_failure_time,
+            'recovery_timeout': self.recovery_timeout,
+            'recent_transitions': self.state_history[-5:] if self.state_history else []
+        }
+
+
+class EnhancedSafetyManager(SafetyManager):
+    """
+    Enhanced safety manager with advanced protection mechanisms.
+    
+    Features:
+    - Intelligent rate limiting
+    - Attack profiling
+    - Circuit breaker pattern
+    - Predictive safety analysis
+    """
+    
+    def __init__(self, limits: Optional[ResourceLimits] = None):
+        super().__init__(limits)
+        
+        # Enhanced components
+        self.rate_limiter = IntelligentRateLimiter()
+        self.attack_profiler = AttackProfiler()
+        self.circuit_breaker = CircuitBreaker()
+        
+        # Predictive safety
+        self.safety_predictions = {}
+        self.incident_history = []
+    
+    def validate_attack_request(self, target: str, port: int, protocol: str,
+                               duration: int = 0, config: Dict = None) -> Tuple[bool, str]:
+        """Enhanced attack validation with profiling"""
+        # Check circuit breaker first
+        can_proceed, reason = self.circuit_breaker.can_proceed()
+        if not can_proceed:
+            return False, f"Circuit breaker: {reason}"
+        
+        # Run base validation
+        is_valid, base_reason = super().validate_attack_request(target, port, protocol, duration)
+        if not is_valid:
+            self.circuit_breaker.record_failure(base_reason)
+            return False, base_reason
+        
+        # Profile the attack if config provided
+        if config:
+            attack_id = f"{target}:{port}:{time.time()}"
+            profile = self.attack_profiler.profile_attack(attack_id, config)
+            
+            # Check risk assessment
+            assessment = self.attack_profiler.get_risk_assessment(attack_id)
+            if assessment['risk_score'] > 0.9:
+                self.circuit_breaker.record_failure('high_risk_attack')
+                return False, f"Attack risk too high: {assessment['recommendation']}"
+        
+        self.circuit_breaker.record_success()
+        return True, "Enhanced validation passed"
+    
+    def get_optimal_rate(self) -> int:
+        """Get optimal attack rate based on current conditions"""
+        usage = self.resource_monitor.get_current_usage()
+        
+        cpu_usage = usage.get('cpu_percent', 0) / 100
+        memory_usage = usage.get('memory_percent', 0) / 100
+        
+        # Estimate network usage (simplified)
+        network_usage = 0.5  # Default estimate
+        
+        # Get error rate from recent attacks
+        error_rate = 0.0
+        if self.active_attacks:
+            # Would need actual error tracking
+            error_rate = 0.05
+        
+        return self.rate_limiter.calculate_optimal_rate(
+            cpu_usage, memory_usage, network_usage, error_rate
+        )
+    
+    def predict_safety_issues(self, config: Dict) -> Dict:
+        """Predict potential safety issues for a configuration"""
+        predictions = {
+            'cpu_overload_risk': 0.0,
+            'memory_exhaustion_risk': 0.0,
+            'network_saturation_risk': 0.0,
+            'overall_risk': 0.0,
+            'recommendations': []
+        }
+        
+        # Analyze configuration
+        rate = config.get('packet_rate', 0)
+        threads = config.get('thread_count', 0)
+        packet_size = config.get('packet_size', 0)
+        
+        # CPU risk based on threads and rate
+        cpu_risk = min(1.0, (threads / 64) * 0.5 + (rate / 1000000) * 0.5)
+        predictions['cpu_overload_risk'] = cpu_risk
+        
+        # Memory risk based on packet size and rate
+        memory_risk = min(1.0, (packet_size * rate) / (1024 * 1024 * 1024))
+        predictions['memory_exhaustion_risk'] = memory_risk
+        
+        # Network risk based on rate and packet size
+        bandwidth_mbps = (rate * packet_size * 8) / (1024 * 1024)
+        network_risk = min(1.0, bandwidth_mbps / self.limits.max_network_mbps)
+        predictions['network_saturation_risk'] = network_risk
+        
+        # Overall risk
+        predictions['overall_risk'] = max(cpu_risk, memory_risk, network_risk)
+        
+        # Generate recommendations
+        if cpu_risk > 0.7:
+            predictions['recommendations'].append(
+                f"Consider reducing threads from {threads} to {max(1, threads // 2)}"
+            )
+        
+        if memory_risk > 0.7:
+            predictions['recommendations'].append(
+                f"Consider reducing packet size from {packet_size} to {packet_size // 2}"
+            )
+        
+        if network_risk > 0.7:
+            predictions['recommendations'].append(
+                f"Consider reducing rate from {rate} to {rate // 2}"
+            )
+        
+        return predictions
+    
+    def get_enhanced_status(self) -> Dict:
+        """Get enhanced safety status"""
+        base_status = self.get_safety_status()
+        
+        base_status.update({
+            'circuit_breaker': self.circuit_breaker.get_status(),
+            'rate_recommendation': self.rate_limiter.get_rate_recommendation(),
+            'active_risk_scores': self.attack_profiler.risk_scores.copy(),
+            'incident_count': len(self.incident_history)
+        })
+        
+        return base_status
