@@ -1,157 +1,204 @@
-# NetStress 2.0 Project Structure
+# NetStress 2.0 Power Trio - Project Structure
 
-## Version 2.0 - Optimized Architecture
+## Overview
 
-### Key Optimizations Applied (December 2025)
+NetStress 2.0 uses a clean, production-ready project structure following Python best practices and the Power Trio architecture (Python/Rust/C).
 
-1. **Native Rust Engine (v2.0)**
-
-   - Multiple sockets per thread (4x) for reduced lock contention
-   - 32MB socket buffers for high throughput
-   - Connected UDP sockets (avoids per-packet address lookup)
-   - Batch atomic counter updates (5000 packets)
-   - Pre-generated payload variants for cache efficiency
-   - TCP connection pooling with keep-alive
-   - Peak performance: 400,000+ PPS
-
-2. **Python Fallback Engine (Optimized)**
-
-   - Multiple sockets per thread (4x)
-   - Connected UDP sockets
-   - Thread-local statistics buffers
-   - Batch updates to reduce lock contention
-   - Adaptive rate limiting
-   - Peak performance: 220,000+ PPS
-
-3. **Advanced Evasion System**
-
-   - Markov chain-based timing patterns
-   - Entropy-maximizing payload variations
-   - Protocol-aware traffic mimicry
-   - Real-time defense detection response
-   - Browser behavior simulation
-
-4. **Lock-Free Data Structures**
-
-   - Batch queue for high-throughput scenarios
-   - Lock-free statistics aggregator
-   - Adaptive rate limiter with feedback
-
-5. **New Attack Vectors**
-   - Protocol fuzzer with grammar-based mutations
-   - Advanced Slowloris with connection pooling
-   - DNS amplification engine with resolver discovery
-
-## Production-Ready Directory Layout
+## Directory Structure
 
 ```
--NetStress-/
-├── core/                    # Core Python modules
-│   ├── analytics/           # Real-time analytics and metrics
-│   ├── antidetect/          # Anti-detection and evasion
-│   ├── attacks/             # Attack implementations
-│   ├── capabilities/        # System capability detection
-│   ├── control/             # Rate control and adaptation
-│   ├── engines/             # Packet engines
-│   ├── evasion/             # Traffic shaping and obfuscation
-│   ├── intelligence/        # Traffic intelligence
-│   ├── interfaces/          # CLI and API interfaces
-│   ├── monitoring/          # Performance monitoring
-│   ├── performance/         # Performance optimizations
-│   ├── protocols/           # Protocol implementations
-│   ├── recon/               # Reconnaissance tools
-│   ├── safety/              # Safety mechanisms
-│   ├── simulation/          # Network simulation
-│   └── native_engine.py     # Native Rust engine integration
+NetStress/
+├── core/                      # Core Python modules
+│   ├── ai/                    # AI/ML optimization
+│   │   ├── attack_optimizer.py
+│   │   ├── reinforcement_learning.py
+│   │   ├── defense_evasion.py
+│   │   └── ...
+│   ├── analytics/             # Real-time analytics
+│   │   ├── metrics_collector.py
+│   │   ├── predictive_analytics.py
+│   │   └── ...
+│   ├── antidetect/            # Anti-detection capabilities
+│   ├── attacks/               # Attack implementations
+│   ├── autonomous/            # Autonomous adaptation
+│   ├── capabilities/          # Capability reporting
+│   ├── config/                # Configuration management
+│   ├── control/               # Rate control
+│   ├── distributed/           # Distributed coordination
+│   ├── engines/               # Packet engines
+│   ├── evasion/               # Evasion techniques
+│   ├── health/                # Health monitoring
+│   ├── integration/           # System integration
+│   ├── intelligence/          # Traffic intelligence
+│   ├── interfaces/            # CLI, API, GUI
+│   ├── memory/                # Memory management
+│   ├── monitoring/            # Performance monitoring
+│   ├── networking/            # Network operations
+│   ├── orchestration/         # Attack orchestration
+│   ├── performance/           # Performance optimization
+│   ├── platform/              # Platform abstraction
+│   ├── plugins/               # Plugin system
+│   ├── protocols/             # Protocol implementations
+│   ├── recon/                 # Reconnaissance
+│   ├── reporting/             # Report generation
+│   ├── safety/                # Safety controls
+│   ├── simulation/            # Network simulation
+│   ├── target/                # Target analysis
+│   ├── testing/               # Testing utilities
+│   └── native_engine.py       # Native engine wrapper
 │
-├── native/                  # Native high-performance engine
-│   ├── rust_engine/         # Rust packet engine (PyO3)
-│   │   ├── src/             # Rust source code
-│   │   ├── Cargo.toml       # Rust dependencies
-│   │   └── pyproject.toml   # Python build config
-│   └── c_driver/            # C hardware interface
-│       ├── driver_shim.c    # Backend implementations
-│       └── driver_shim.h    # API definitions
+├── native/                    # Native Rust/C code
+│   ├── rust_engine/           # Rust packet engine
+│   │   ├── src/
+│   │   │   ├── lib.rs         # PyO3 module
+│   │   │   ├── engine.rs      # Flood engine
+│   │   │   ├── packet.rs      # Packet building
+│   │   │   ├── stats.rs       # Statistics
+│   │   │   ├── pool.rs        # Buffer pools
+│   │   │   ├── simd.rs        # SIMD operations
+│   │   │   ├── queue.rs       # Lock-free queues
+│   │   │   ├── backend.rs     # Backend abstraction
+│   │   │   ├── safety.rs      # Safety controls
+│   │   │   └── ...
+│   │   └── Cargo.toml
+│   └── c_driver/              # C hardware drivers
+│       ├── driver_shim.c
+│       └── driver_shim.h
 │
-├── tests/                   # Test suite
-│   ├── test_properties.py   # Property-based tests
-│   ├── test_integration_power_trio.py
+├── tests/                     # Test suite
+│   ├── test_properties.py     # Property-based tests
+│   ├── test_*.py              # Unit/integration tests
+│   └── unit/                  # Unit tests
+│
+├── docs/                      # Documentation
+│   ├── API_REFERENCE.md       # API documentation
+│   ├── ARCHITECTURE.md        # Architecture guide
+│   ├── BUILD_INSTRUCTIONS.md  # Build guide
+│   ├── CLI_USAGE.md           # CLI documentation
+│   ├── QUICK_START.md         # Quick start guide
+│   ├── USAGE.md               # Usage guide
 │   └── ...
 │
-├── config/                  # Configuration files
-├── docs/                    # Documentation
-├── examples/                # Usage examples
-├── scripts/                 # Build and install scripts
-├── tools/                   # Utility tools
-├── bin/                     # Compiled binaries
-├── models/                  # AI/ML models
+├── config/                    # Configuration files
+│   ├── development.conf
+│   └── production.conf
 │
-├── ddos.py                  # Main entry point
-├── main.py                  # Alternative entry point
-├── netstress_cli.py         # CLI interface
+├── scripts/                   # Utility scripts
+│   ├── install.sh             # Linux/macOS installer
+│   ├── install.ps1            # Windows installer
+│   ├── benchmark.py           # Benchmarking
+│   └── deploy.py              # Deployment
 │
-├── README.md                # Main documentation
-├── CAPABILITIES.md          # Feature capabilities
-├── PERFORMANCE_BENCHMARK.md # Benchmark results
-├── SECURITY.md              # Security guidelines
-├── CONTRIBUTING.md          # Contribution guide
-├── CHANGELOG.md             # Version history
-├── LICENSE                  # MIT License
+├── examples/                  # Example code
+│   ├── native_stats_bridge_demo.py
+│   └── tls_mutual_auth_example.py
 │
-├── requirements.txt         # Python dependencies
-├── pyproject.toml           # Python project config
-├── setup.py                 # Package setup
-├── Makefile                 # Build automation
-├── Dockerfile               # Container build
-├── docker-compose.yml       # Container orchestration
+├── .github/                   # GitHub workflows
 │
-├── .gitignore               # Git ignore rules
-├── .github/                 # GitHub workflows
+├── unnecessary/               # Archived/old files (gitignored)
 │
-└── unnecessary/             # Archived/old files (gitignored)
+├── ddos.py                    # Main attack engine
+├── main.py                    # Entry point
+├── netstress_cli.py           # CLI interface
+├── benchmark_comparison.py    # Performance benchmark
+├── requirements.txt           # Python dependencies
+├── pyproject.toml             # Project configuration
+├── setup.py                   # Package setup
+├── Makefile                   # Build automation
+├── Dockerfile                 # Docker image
+├── docker-compose.yml         # Docker compose
+├── README.md                  # Main documentation
+├── LICENSE                    # MIT License
+├── CHANGELOG.md               # Version history
+├── CONTRIBUTING.md            # Contribution guide
+├── SECURITY.md                # Security policy
+└── CODE_OF_CONDUCT.md         # Code of conduct
 ```
 
 ## Key Files
 
-| File                            | Purpose                        |
-| ------------------------------- | ------------------------------ |
-| `ddos.py`                       | Main attack engine and CLI     |
-| `main.py`                       | Alternative entry point        |
-| `core/native_engine.py`         | Native Rust engine integration |
-| `benchmark_native_vs_python.py` | Performance comparison tool    |
+### Entry Points
 
-## Building the Native Engine
+- `main.py` - Main entry point
+- `ddos.py` - Core attack engine
+- `netstress_cli.py` - Command-line interface
+
+### Configuration
+
+- `config/development.conf` - Development settings
+- `config/production.conf` - Production settings
+- `netstress.json` - Runtime configuration
+
+### Native Engine
+
+- `native/rust_engine/` - Rust packet engine (PyO3)
+- `native/c_driver/` - C hardware drivers
+
+### Core Modules
+
+- `core/native_engine.py` - Native engine Python wrapper
+- `core/ai/` - AI/ML optimization
+- `core/analytics/` - Real-time analytics
+- `core/attacks/` - Attack implementations
+- `core/safety/` - Safety controls
+
+## Build Commands
 
 ```bash
-# Prerequisites
-pip install maturin
+# Install dependencies
+pip install -r requirements.txt
 
-# Build and install
+# Build native engine
 cd native/rust_engine
 maturin develop --release
 
-# Verify
-python -c "from core.native_engine import NATIVE_ENGINE_AVAILABLE; print(f'Native: {NATIVE_ENGINE_AVAILABLE}')"
-```
-
-## Quick Start
-
-```bash
-# Check system capabilities
-python ddos.py --status
+# Run tests
+pytest tests/ -v
 
 # Run benchmark
-python benchmark_native_vs_python.py
+python benchmark_comparison.py
+```
 
-# Basic UDP flood test
-python ddos.py -i 127.0.0.1 -p 9999 -t UDP -d 10
+## Module Dependencies
+
+```
+main.py
+  └── ddos.py
+        ├── core/native_engine.py
+        │     └── native/rust_engine (PyO3)
+        │           └── native/c_driver (FFI)
+        ├── core/ai/
+        ├── core/analytics/
+        ├── core/attacks/
+        ├── core/safety/
+        └── core/...
 ```
 
 ## Performance Tiers
 
-| Backend                | PPS      | Platform   |
-| ---------------------- | -------- | ---------- |
-| Native Rust (IOCP)     | 300K+    | Windows    |
-| Native Rust (io_uring) | 1M+      | Linux 5.1+ |
-| Native Rust (sendmmsg) | 500K+    | Linux 3.0+ |
-| Pure Python            | 50K-200K | All        |
+| Tier | Backend    | PPS      | Use Case              |
+| ---- | ---------- | -------- | --------------------- |
+| 1    | DPDK       | 100M+    | Production, high-end  |
+| 2    | AF_XDP     | 10M-50M  | Linux, kernel bypass  |
+| 3    | io_uring   | 1M-10M   | Linux 5.1+, async     |
+| 4    | sendmmsg   | 500K-2M  | Linux, batch syscalls |
+| 5    | Raw Socket | 50K-500K | Cross-platform        |
+| 6    | Python     | 50K-200K | Fallback              |
+
+## Cleanup Guidelines
+
+Files that should be in `unnecessary/`:
+
+- Old test files not in `tests/`
+- Benchmark results and reports
+- Temporary logs
+- Old code versions
+- Generated reports
+
+Files that should NOT be committed:
+
+- `*.log` files
+- `models/*.pkl` (large binary files)
+- `__pycache__/`
+- `*.pyc`
+- Build artifacts

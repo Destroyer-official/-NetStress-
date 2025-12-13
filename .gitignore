@@ -131,8 +131,7 @@ attack.log
 *.log
 audit_logs/*.db
 audit_logs/*.log
-demo_audit_logs/*.db
-demo_audit_logs/*.log
+demo_audit_logs/
 *.pid
 *.lock
 
@@ -142,14 +141,42 @@ comprehensive_test_report_*.json
 stress_test_report*.json
 stress_test_report*.txt
 speed_test_results.txt
-validation_reports/
+test_output.txt
+test_results_final.txt
+test_final_results.txt
 
-# Unnecessary/archived files
+# Unnecessary/archived files - ALWAYS IGNORE
 unnecessary/
 old_*/
 temp_*/
 *_backup/
 *.backup
+
+# Root level test files (should be in tests/)
+test_*.py
+!tests/test_*.py
+
+# Benchmark files (keep benchmark_comparison.py)
+benchmark_*.py
+!benchmark_comparison.py
+benchmark_*.txt
+benchmark_*.json
+
+# Generated reports directories
+validation_reports/
+compliance_reports/
+benchmark_reports/
+regression_reports/
+
+# Checkpoint and summary files
+checkpoint_*.py
+*_summary.py
+*_runner.py
+!tests/*_runner.py
+
+# Model files (large binary files)
+models/
+!models/.gitkeep
 
 # Generated reports
 *_report*.txt

